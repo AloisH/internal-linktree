@@ -1,0 +1,21 @@
+# Node / Nuxt
+node_modules/
+.output/
+.nuxt/
+.nitro/
+.cache/
+dist/
+coverage/
+*.tsbuildinfo
+
+# SQLite lives here in dev (NUXT_DB_PATH)
+data/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.swp

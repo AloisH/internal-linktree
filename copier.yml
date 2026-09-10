@@ -1,0 +1,49 @@
+# internal-linktree is distributed as a Copier template:
+#
+#   copier copy --trust gh:AloisH/internal-linktree my-page
+#
+# and later improvements to the starter reach already-generated projects with
+# a three-way merge:
+#
+#   cd my-page && copier update
+#
+# Same design as charpente: the template repo stays a plain, runnable project
+# (its own CI runs the full suite on every change). A post-copy task renames
+# the project (scripts/copier-rename.sh) instead of {{ placeholders }}.
+
+project_name:
+  type: str
+  help: "Project slug (lowercase, used for the package and the image name)"
+  default: my-page
+  validator: >-
+    {% if not (project_name | regex_search('^[a-z][a-z0-9-]+$')) %}
+    project_name must be lowercase letters, digits and dashes, starting with a letter
+    {% endif %}
+
+github_owner:
+  type: str
+  help: "GitHub user/org that owns the repo (GHCR image namespace)"
+  default: your-github-name
+
+_exclude:
+  - ".git"
+  - "node_modules"
+  - ".output"
+  - ".nuxt"
+  - "data"
+  - ".env"
+  - "CHANGELOG.md"
+
+_tasks:
+  - "sh scripts/copier-rename.sh '{{ project_name }}' '{{ github_owner }}'"
+
+_message_after_copy: |
+  {{ project_name }} is ready.
+
+    cd {{ _copier_conf.dst_path }}
+    mise install          # pinned node / pnpm / just
+    cp .env.example .env  # then set NUXT_ADMIN_TOKEN
+    pnpm install
+    just dev              # http://localhost:3000 — admin at /admin
+
+  Later, pull starter improvements with:  copier update

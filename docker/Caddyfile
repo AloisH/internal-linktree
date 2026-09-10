@@ -1,0 +1,5 @@
+# Automatic TLS for the one domain; everything (pages, /api, /admin) is same-origin.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

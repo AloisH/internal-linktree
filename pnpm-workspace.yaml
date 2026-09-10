@@ -1,0 +1,4 @@
+# Single package — this file only carries pnpm settings (pnpm 10 reads them here).
+onlyBuiltDependencies:
+  - lefthook
+  - esbuild

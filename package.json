@@ -1,0 +1,43 @@
+{
+  "name": "internal-linktree",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_OPTIONS=--disable-warning=ExperimentalWarning nuxt dev",
+    "build": "NODE_OPTIONS=--disable-warning=ExperimentalWarning nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "prepare": "lefthook install || true",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "oxlint --deny-warnings",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "knip": "knip"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.11.0",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.41",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@iconify-json/lucide": "^1.2.0",
+    "@types/node": "^24.0.0",
+    "knip": "^6.34.0",
+    "lefthook": "^2.1.12",
+    "oxfmt": "0.66.0",
+    "oxlint": "^1.81.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.10",
+    "vue-tsc": "^3.3.11"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.15.0"
+}
