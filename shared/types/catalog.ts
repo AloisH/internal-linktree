@@ -1,0 +1,28 @@
+export interface Category {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string;
+  position: number;
+  created_at: string;
+}
+
+export type LinkKind = "url" | "file";
+
+export interface Link {
+  id: number;
+  category_id: number;
+  kind: LinkKind;
+  title: string;
+  description: string | null;
+  url: string | null;
+  file_name: string | null;
+  file_mime: string | null;
+  file_size: number | null;
+  position: number;
+  created_at: string;
+}
+
+export interface CategoryWithLinks extends Category {
+  links: Link[];
+}

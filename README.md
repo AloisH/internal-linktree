@@ -1,65 +1,65 @@
 # internal-linktree
 
-The small sibling of [charpente](https://github.com/AloisH/charpente): one
-Nuxt 4 page, an admin dashboard behind a shared secret, SQLite in a file —
-with charpente's tooling (lint, format, typecheck, tests, CI, GHCR releases,
-Copier template) and none of its infrastructure.
+Portail interne pour un établissement de santé : une page publique qui liste,
+par catégorie, les applications métier et les documents de référence, et une
+administration derrière un mot de passe pour les gérer.
 
-## Stack
+Généré depuis [cabane](https://github.com/AloisH/cabane) : Nuxt 4, Nuxt UI,
+SQLite via `node:sqlite`, une image Docker.
 
-| Layer   | Tech                                                             |
-| ------- | ---------------------------------------------------------------- |
-| App     | Nuxt 4 (SSR), Nuxt UI (Tailwind v4, forms, toasts, dark mode)    |
-| Data    | SQLite via `node:sqlite` (stdlib, no native module), WAL         |
-| Admin   | `/admin` — one password from `NUXT_ADMIN_TOKEN`, httpOnly cookie |
-| Schemas | zod, shared between the form and the API route                   |
-| Deploy  | One Docker image (GHCR) + docker compose + Caddy (auto-TLS)      |
+## Fonctionnalités
 
-## Start a new project
+- **Catégories** — nom, description, icône (liste lucide), ordre manuel.
+- **Liens** — une application (URL http/https) ou un fichier importé (PDF,
+  images, Office, 25 Mo max). Titre, description, ordre manuel, déplacement
+  entre catégories.
+- **Portail** — recherche instantanée, navigation par catégorie, PDF et images
+  ouverts dans le navigateur, autres fichiers téléchargés sous leur nom d'origine.
+- **Administration** (`/admin`) — un mot de passe (`NUXT_ADMIN_TOKEN`), cookie
+  httpOnly, limitation des tentatives de connexion.
 
-```sh
-pipx install copier
-copier copy --trust gh:AloisH/internal-linktree my-page
-```
-
-Later, pull starter improvements with `copier update`.
-
-## Development
+## Développement
 
 ```sh
-mise install              # pinned node / pnpm / just
-cp .env.example .env      # then set NUXT_ADMIN_TOKEN
+mise install              # node / pnpm / just épinglés
+cp .env.example .env      # puis définir NUXT_ADMIN_TOKEN
 pnpm install
-just dev                  # http://localhost:3000 — admin at /admin
+just dev                  # http://localhost:3000 — admin sur /admin
 ```
 
-## Everyday commands
+## Commandes
 
 ```sh
 just lint       # oxfmt + oxlint + nuxt typecheck + knip
 just test       # vitest
 just build      # nuxt build
-just release patch   # tag → CI builds ghcr.io/<owner>/internal-linktree
-just deploy     # on the server: compose pull && up -d
+just release patch   # tag → CI publie ghcr.io/AloisH/internal-linktree
+just deploy     # sur le serveur : compose pull && up -d
 ```
 
-## Layout
+## Configuration
+
+| Variable                   | Rôle                                      | Défaut                  |
+| -------------------------- | ----------------------------------------- | ----------------------- |
+| `NUXT_ADMIN_TOKEN`         | Mot de passe de `/admin` (12+ caractères) | —                       |
+| `NUXT_DB_PATH`             | Fichier SQLite                            | `./data/app.db`         |
+| `NUXT_UPLOADS_DIR`         | Dossier des fichiers importés             | `./data/uploads`        |
+| `NUXT_PUBLIC_SITE_NAME`    | Nom affiché sur le portail                | `Portail interne`       |
+| `NUXT_PUBLIC_SITE_TAGLINE` | Sous-titre du portail                     | voir `.env.example`     |
+| `NUXT_PUBLIC_SITE_URL`     | URL canonique                             | `http://localhost:3000` |
+
+En Docker, base et fichiers vivent dans le volume `/app/data`.
+
+## Arborescence
 
 ```
-app/pages/index.vue          the page (+ contact form)
-app/pages/admin/             login + dashboard
-server/api/messages.post.ts  public write
-server/api/admin/            guarded by server/middleware/admin.ts
-server/utils/db.ts           node:sqlite connection + MIGRATIONS array
-shared/utils/schemas.ts      zod schemas used by both sides
+app/pages/index.vue            portail public (recherche, catégories, cartes)
+app/pages/admin/               connexion + tableau de bord
+app/components/                LinkCard, CategoryModal, LinkModal
+server/api/catalog.get.ts      lecture publique
+server/api/files/[id].get.ts   téléchargement public
+server/api/admin/              CRUD catégories et liens, guardé par server/middleware/admin.ts
+server/utils/catalog.ts        requêtes SQL pures (testées avec openDb(":memory:"))
+server/utils/files.ts          stockage disque des imports
+shared/utils/schemas.ts        schémas zod partagés formulaire ↔ API
 ```
-
-## Deliberately left out
-
-- **Real auth.** One admin, one password. Add Better Auth when a second person
-  needs to log in.
-- **An ORM.** Hand-written SQL against three tables is shorter than the setup.
-  Drizzle when it stops being true.
-- **i18n.** French inline. `@nuxtjs/i18n` when the site goes bilingual.
-- **Rate limiting the contact form.** The login route has one; add the same
-  Map to `messages.post.ts` the day spam shows up.

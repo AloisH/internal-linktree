@@ -9,16 +9,22 @@ export default defineNuxtConfig({
     adminToken: "",
     // NUXT_DB_PATH — SQLite file, created on first boot.
     dbPath: "./data/app.db",
+    // NUXT_UPLOADS_DIR — where uploaded files live (same volume as the DB in Docker).
+    uploadsDir: "./data/uploads",
     public: {
       // NUXT_PUBLIC_SITE_URL
       siteUrl: "http://localhost:3000",
+      // NUXT_PUBLIC_SITE_NAME — shown in the header and the browser tab.
+      siteName: "Portail interne",
+      // NUXT_PUBLIC_SITE_TAGLINE
+      siteTagline: "Applications et documents de l’établissement, au même endroit.",
     },
   },
 
   app: {
     head: {
       htmlAttrs: { lang: "fr" },
-      titleTemplate: "%s · internal-linktree",
+      titleTemplate: "%s · Portail interne",
       meta: [{ name: "viewport", content: "width=device-width, initial-scale=1" }],
       link: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
     },
@@ -27,10 +33,5 @@ export default defineNuxtConfig({
   nitro: {
     // node:sqlite is newer than the builtin list rollup ships with.
     rollupConfig: { external: ["node:sqlite"] },
-  },
-
-  routeRules: {
-    // Nothing on the public page depends on a request — render it once at build.
-    "/": { prerender: true },
   },
 });

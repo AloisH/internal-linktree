@@ -47,38 +47,8 @@ jobs:
           docker run -d --name app -p 3000:3000 -e NUXT_ADMIN_TOKEN=ci-only-admin-token internal-linktree:ci
           timeout 30 sh -c 'until curl -sf http://localhost:3000/api/health; do sleep 1; done'
           curl -sf http://localhost:3000/ >/dev/null
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/messages)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/categories)" = "401"
           docker logs app
-
-  # The starter is a Copier template: render it and make sure the rename task
-  # left no trace of the template identity, then typecheck the rendered app.
-  template-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Render the template
-        run: |
-          pipx install copier
-          copier copy --vcs-ref HEAD --trust --defaults \
-            --data project_name=renderling --data github_owner=render-org \
-            . /tmp/renderling
-      - name: No template identity may survive the rename
-        run: |
-          if grep -ri "internal-linktree" /tmp/renderling --exclude-dir=.git --exclude=.copier-answers.yml -l; then
-            echo "::error::rendered project still references the template name"
-            exit 1
-          fi
-      - name: Rendered app typechecks and tests
-        run: |
-          cd /tmp/renderling
-          pnpm install --no-frozen-lockfile
-          pnpm typecheck
-          pnpm test
 
   secrets:
     runs-on: ubuntu-latest

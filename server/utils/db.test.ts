@@ -11,18 +11,10 @@ describe("db", () => {
     expect(version()).toBe(MIGRATIONS.length);
   });
 
-  it("stores and reads back a message with a server-side timestamp", () => {
+  it("enforces foreign keys so links cannot outlive their category", () => {
     const db = openDb(":memory:");
-    db.prepare("INSERT INTO messages (name, email, body) VALUES (?, ?, ?)").run(
-      "Ada",
-      "ada@example.com",
-      "Hi",
-    );
-    const row = db.prepare("SELECT name, email, body, created_at FROM messages").get() as Record<
-      string,
-      unknown
-    >;
-    expect(row).toMatchObject({ name: "Ada", email: "ada@example.com", body: "Hi" });
-    expect(new Date(row.created_at as string).getTime()).not.toBeNaN();
+    expect(() =>
+      db.prepare("INSERT INTO links (category_id, kind, title) VALUES (?, 'url', 'x')").run(42),
+    ).toThrow(/FOREIGN KEY/);
   });
 });

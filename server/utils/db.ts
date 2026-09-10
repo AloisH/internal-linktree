@@ -13,6 +13,32 @@ export const MIGRATIONS: readonly string[] = [
      body       TEXT NOT NULL,
      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
    )`,
+  // v2 — the link portal: categories hold links to apps (url) or uploaded
+  // files. The starter's contact form is gone with it.
+  `DROP TABLE messages;
+   CREATE TABLE categories (
+     id          INTEGER PRIMARY KEY,
+     name        TEXT NOT NULL,
+     description TEXT,
+     icon        TEXT NOT NULL DEFAULT 'i-lucide-folder',
+     position    INTEGER NOT NULL DEFAULT 0,
+     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+   );
+   CREATE TABLE links (
+     id          INTEGER PRIMARY KEY,
+     category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+     kind        TEXT NOT NULL CHECK (kind IN ('url', 'file')),
+     title       TEXT NOT NULL,
+     description TEXT,
+     url         TEXT,
+     file_name   TEXT,
+     stored_name TEXT,
+     file_mime   TEXT,
+     file_size   INTEGER,
+     position    INTEGER NOT NULL DEFAULT 0,
+     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+   );
+   CREATE INDEX links_category ON links (category_id, position);`,
 ];
 
 export function openDb(path: string): DatabaseSync {

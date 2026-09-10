@@ -1,56 +1,290 @@
 <script setup lang="ts">
+import type { LinkModalMode } from "~/components/LinkModal.vue";
+
 definePageMeta({ middleware: "admin" });
 useSeoMeta({ title: "Administration", robots: "noindex" });
 
-const { data: messages, refresh } = await useFetch<Message[]>("/api/admin/messages");
+const { data: catalog, refresh } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
+  default: () => [],
+});
 const toast = useToast();
 
-async function remove(id: number): Promise<void> {
-  await $fetch(`/api/admin/messages/${id}`, { method: "DELETE" });
-  toast.add({ title: "Message supprimé", color: "neutral" });
+// ── Category modal ─────────────────────────────────────────────
+const categoryOpen = ref(false);
+const editingCategory = ref<Category | null>(null);
+function newCategory(): void {
+  editingCategory.value = null;
+  categoryOpen.value = true;
+}
+function editCategory(c: Category): void {
+  editingCategory.value = c;
+  categoryOpen.value = true;
+}
+
+// ── Link modal ─────────────────────────────────────────────────
+const linkOpen = ref(false);
+const linkMode = ref<LinkModalMode>("url");
+const linkCategoryId = ref<number>();
+const editingLink = ref<Link | null>(null);
+function newLink(mode: LinkModalMode, categoryId: number): void {
+  linkMode.value = mode;
+  linkCategoryId.value = categoryId;
+  editingLink.value = null;
+  linkOpen.value = true;
+}
+function editLink(l: Link): void {
+  linkMode.value = "edit";
+  editingLink.value = l;
+  linkOpen.value = true;
+}
+
+// ── Mutations ──────────────────────────────────────────────────
+async function run(
+  method: "DELETE" | "POST",
+  url: string,
+  done: string,
+  body?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await $fetch(url, { method, body });
+    toast.add({ title: done, color: "neutral" });
+  } catch {
+    toast.add({ title: "Action impossible", color: "error" });
+  }
   await refresh();
+}
+
+function removeCategory(c: CategoryWithLinks): void {
+  const n = c.links.length;
+  const detail = n ? ` et ses ${n} lien${n > 1 ? "s" : ""}` : "";
+  if (!window.confirm(`Supprimer « ${c.name} »${detail} ?`)) return;
+  void run("DELETE", `/api/admin/categories/${c.id}`, "Catégorie supprimée");
+}
+
+function removeLink(l: Link): void {
+  if (!window.confirm(`Supprimer « ${l.title} » ?`)) return;
+  void run("DELETE", `/api/admin/links/${l.id}`, "Lien supprimé");
+}
+
+function swap<T>(list: T[], from: number, to: number): T[] {
+  const copy = [...list];
+  const [item] = copy.splice(from, 1);
+  copy.splice(to, 0, item as T);
+  return copy;
+}
+
+function moveCategory(index: number, delta: number): void {
+  const ids = swap(catalog.value, index, index + delta).map((c) => c.id);
+  void run("POST", "/api/admin/categories/reorder", "Ordre mis à jour", { ids });
+}
+
+function moveLink(c: CategoryWithLinks, index: number, delta: number): void {
+  const ids = swap(c.links, index, index + delta).map((l) => l.id);
+  void run("POST", "/api/admin/links/reorder", "Ordre mis à jour", { ids });
 }
 
 async function logout(): Promise<void> {
   await $fetch("/api/admin/logout", { method: "POST" });
   await navigateTo("/admin/login");
 }
+
+function linkMeta(l: Link): string {
+  return l.kind === "url" ? hostOf(l.url) : `${l.file_name ?? ""} · ${formatSize(l.file_size)}`;
+}
 </script>
 
 <template>
-  <UContainer class="space-y-6 py-10">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold tracking-tight">Messages</h1>
-      <UButton variant="ghost" color="neutral" icon="i-lucide-log-out" @click="logout"
-        >Déconnexion</UButton
-      >
-    </div>
-
-    <p v-if="!messages?.length" class="text-muted">Aucun message pour l’instant.</p>
-
-    <UCard v-for="m in messages" :key="m.id">
-      <div class="flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <p class="font-medium">
-            {{ m.name }} <span class="text-muted">· {{ m.email }}</span>
-          </p>
-          <NuxtTime
-            :datetime="m.created_at"
-            date-style="medium"
-            time-style="short"
-            locale="fr-FR"
-            class="text-sm text-muted"
+  <div class="min-h-screen bg-elevated/40">
+    <header class="sticky top-0 z-10 border-b border-default bg-default/90 backdrop-blur">
+      <UContainer class="flex h-16 items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <UIcon name="i-lucide-settings-2" class="size-5 text-primary" />
+          <h1 class="text-lg font-semibold tracking-tight">Administration</h1>
+        </div>
+        <div class="flex items-center gap-2">
+          <UButton
+            to="/"
+            target="_blank"
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-external-link"
+            class="hidden sm:inline-flex"
+          >
+            Voir le portail
+          </UButton>
+          <UButton icon="i-lucide-plus" @click="newCategory">Catégorie</UButton>
+          <UButton
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-log-out"
+            aria-label="Déconnexion"
+            @click="logout"
           />
         </div>
-        <UButton
-          variant="ghost"
-          color="error"
-          icon="i-lucide-trash-2"
-          aria-label="Supprimer"
-          @click="remove(m.id)"
-        />
-      </div>
-      <p class="mt-3 whitespace-pre-wrap">{{ m.body }}</p>
-    </UCard>
-  </UContainer>
+      </UContainer>
+    </header>
+
+    <UContainer class="space-y-6 py-8">
+      <UEmpty
+        v-if="catalog.length === 0"
+        icon="i-lucide-folder-plus"
+        title="Aucune catégorie"
+        description="Commencez par créer une catégorie, puis ajoutez-y des applications ou des fichiers."
+      >
+        <template #actions>
+          <UButton icon="i-lucide-plus" @click="newCategory">Créer une catégorie</UButton>
+        </template>
+      </UEmpty>
+
+      <UCard v-for="(c, ci) in catalog" :key="c.id" :ui="{ body: 'p-0 sm:p-0' }">
+        <template #header>
+          <div class="flex flex-wrap items-center gap-3">
+            <span
+              class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+            >
+              <UIcon :name="c.icon" class="size-5" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <h2 class="truncate font-semibold text-highlighted">{{ c.name }}</h2>
+              <p v-if="c.description" class="truncate text-sm text-muted">{{ c.description }}</p>
+            </div>
+            <div class="flex items-center gap-1">
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                icon="i-lucide-chevron-up"
+                aria-label="Monter"
+                :disabled="ci === 0"
+                @click="moveCategory(ci, -1)"
+              />
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                icon="i-lucide-chevron-down"
+                aria-label="Descendre"
+                :disabled="ci === catalog.length - 1"
+                @click="moveCategory(ci, 1)"
+              />
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                icon="i-lucide-pencil"
+                aria-label="Modifier"
+                @click="editCategory(c)"
+              />
+              <UButton
+                variant="ghost"
+                color="error"
+                size="sm"
+                icon="i-lucide-trash-2"
+                aria-label="Supprimer"
+                @click="removeCategory(c)"
+              />
+            </div>
+          </div>
+        </template>
+
+        <ul v-if="c.links.length" class="divide-y divide-default">
+          <li
+            v-for="(l, li) in c.links"
+            :key="l.id"
+            class="flex items-center gap-3 px-4 py-3 sm:px-6"
+          >
+            <UIcon
+              :name="l.kind === 'url' ? 'i-lucide-app-window' : fileIcon(l.file_mime)"
+              class="size-5 shrink-0 text-muted"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-medium">{{ l.title }}</p>
+              <p class="truncate font-mono text-xs text-dimmed">{{ linkMeta(l) }}</p>
+            </div>
+            <UBadge :color="l.kind === 'url' ? 'primary' : 'neutral'" variant="subtle" size="sm">
+              {{ l.kind === "url" ? "Application" : "Fichier" }}
+            </UBadge>
+            <div class="flex items-center gap-1">
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-chevron-up"
+                aria-label="Monter"
+                :disabled="li === 0"
+                @click="moveLink(c, li, -1)"
+              />
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-chevron-down"
+                aria-label="Descendre"
+                :disabled="li === c.links.length - 1"
+                @click="moveLink(c, li, 1)"
+              />
+              <UButton
+                :to="l.kind === 'url' ? (l.url ?? undefined) : `/api/files/${l.id}`"
+                target="_blank"
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-external-link"
+                aria-label="Ouvrir"
+              />
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-pencil"
+                aria-label="Modifier"
+                @click="editLink(l)"
+              />
+              <UButton
+                variant="ghost"
+                color="error"
+                size="xs"
+                icon="i-lucide-trash-2"
+                aria-label="Supprimer"
+                @click="removeLink(l)"
+              />
+            </div>
+          </li>
+        </ul>
+        <p v-else class="px-4 py-4 text-sm text-muted sm:px-6">Aucun lien dans cette catégorie.</p>
+
+        <template #footer>
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              size="sm"
+              variant="soft"
+              icon="i-lucide-app-window"
+              @click="newLink('url', c.id)"
+            >
+              Ajouter une application
+            </UButton>
+            <UButton
+              size="sm"
+              variant="soft"
+              color="neutral"
+              icon="i-lucide-upload"
+              @click="newLink('file', c.id)"
+            >
+              Importer un fichier
+            </UButton>
+          </div>
+        </template>
+      </UCard>
+    </UContainer>
+
+    <CategoryModal v-model:open="categoryOpen" :category="editingCategory" @saved="refresh" />
+    <LinkModal
+      v-model:open="linkOpen"
+      :mode="linkMode"
+      :categories="catalog"
+      :category-id="linkCategoryId"
+      :link="editingLink"
+      @saved="refresh"
+    />
+  </div>
 </template>

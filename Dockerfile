@@ -15,7 +15,7 @@ RUN useradd --system --uid 10001 app && mkdir -p /app/data && chown app /app/dat
 WORKDIR /app
 COPY --from=build /app/.output/ .output/
 USER app
-ENV NITRO_PORT=3000 NITRO_HOST=0.0.0.0 NODE_ENV=production NUXT_DB_PATH=/app/data/app.db \
+ENV NITRO_PORT=3000 NITRO_HOST=0.0.0.0 NODE_ENV=production NUXT_DB_PATH=/app/data/app.db NUXT_UPLOADS_DIR=/app/data/uploads \
     NODE_OPTIONS=--disable-warning=ExperimentalWarning
 VOLUME /app/data
 EXPOSE 3000

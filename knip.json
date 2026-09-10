@@ -1,5 +1,4 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
-  "entry": ["app.config.ts"],
   "ignoreDependencies": ["@iconify-json/lucide", "h3", "vue", "vue-tsc"]
 }

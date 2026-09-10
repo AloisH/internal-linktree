@@ -1,68 +1,143 @@
 <script setup lang="ts">
-import type { FormSubmitEvent } from "@nuxt/ui";
+const { siteName, siteTagline } = useRuntimeConfig().public;
 
 useSeoMeta({
   title: "Accueil",
-  description: "internal-linktree — une page, un formulaire, une base SQLite.",
-  ogTitle: "internal-linktree",
-  ogDescription: "Une page, un formulaire, une base SQLite.",
+  description: siteTagline,
+  ogTitle: siteName,
+  ogDescription: siteTagline,
 });
 
-const state = reactive<Partial<MessageInput>>({});
-const sending = ref(false);
-const toast = useToast();
+const { data: catalog } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
+  default: () => [],
+});
 
-async function onSubmit(event: FormSubmitEvent<MessageInput>): Promise<void> {
-  sending.value = true;
-  try {
-    await $fetch("/api/messages", { method: "POST", body: event.data });
-    toast.add({
-      title: "Message envoyé",
-      description: "Merci, nous revenons vers vous vite.",
-      color: "success",
-    });
-    Object.assign(state, { name: undefined, email: undefined, body: undefined });
-  } catch {
-    toast.add({
-      title: "Envoi impossible",
-      description: "Réessayez dans un instant.",
-      color: "error",
-    });
-  } finally {
-    sending.value = false;
-  }
+const query = ref("");
+
+function matches(link: Link, q: string): boolean {
+  return [link.title, link.description, link.file_name, link.url].some((s) =>
+    s?.toLowerCase().includes(q),
+  );
 }
+
+const sections = computed(() => {
+  const q = query.value.trim().toLowerCase();
+  return catalog.value
+    .map((c) => {
+      const keepAll = !q || c.name.toLowerCase().includes(q);
+      const links = keepAll ? c.links : c.links.filter((l) => matches(l, q));
+      return { category: c, links };
+    })
+    .filter((s) => s.links.length > 0);
+});
+
+const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 0));
 </script>
 
 <template>
-  <UContainer class="flex min-h-screen flex-col justify-center gap-16 py-16">
-    <section class="max-w-2xl">
-      <p class="font-mono text-sm text-muted">internal-linktree</p>
-      <h1 class="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-        Une page. Une base. Rien de plus.
-      </h1>
-      <p class="mt-6 text-lg text-muted">
-        Le petit frère de charpente : Nuxt 4, Nuxt UI, SQLite embarqué et un tableau de bord
-        derrière un mot de passe. Remplacez ce texte par le vôtre.
-      </p>
-    </section>
+  <div class="min-h-screen bg-elevated/40">
+    <header class="border-b border-default bg-default/80 backdrop-blur">
+      <UContainer class="py-10 sm:py-14">
+        <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div class="max-w-2xl">
+            <p
+              class="flex items-center gap-2 font-mono text-xs tracking-wider text-primary uppercase"
+            >
+              <UIcon name="i-lucide-heart-pulse" class="size-4" />
+              Espace professionnel
+            </p>
+            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-highlighted sm:text-4xl">
+              {{ siteName }}
+            </h1>
+            <p class="mt-3 text-base text-muted sm:text-lg">{{ siteTagline }}</p>
+          </div>
+          <UInput
+            v-model="query"
+            icon="i-lucide-search"
+            size="xl"
+            placeholder="Rechercher une application ou un document…"
+            class="w-full lg:w-96"
+            :ui="{ trailing: 'pe-1' }"
+          >
+            <template v-if="query" #trailing>
+              <UButton
+                color="neutral"
+                variant="link"
+                size="sm"
+                icon="i-lucide-circle-x"
+                aria-label="Effacer"
+                @click="query = ''"
+              />
+            </template>
+          </UInput>
+        </div>
 
-    <UCard class="max-w-xl">
-      <template #header>
-        <h2 class="text-lg font-semibold">Nous écrire</h2>
-      </template>
-      <UForm :schema="messageSchema" :state="state" class="space-y-4" @submit="onSubmit">
-        <UFormField label="Nom" name="name">
-          <UInput v-model="state.name" class="w-full" autocomplete="name" />
-        </UFormField>
-        <UFormField label="E-mail" name="email">
-          <UInput v-model="state.email" type="email" class="w-full" autocomplete="email" />
-        </UFormField>
-        <UFormField label="Message" name="body">
-          <UTextarea v-model="state.body" class="w-full" :rows="5" />
-        </UFormField>
-        <UButton type="submit" :loading="sending">Envoyer</UButton>
-      </UForm>
-    </UCard>
-  </UContainer>
+        <nav v-if="catalog.length > 1" class="mt-8 flex flex-wrap gap-2" aria-label="Catégories">
+          <UButton
+            v-for="c in catalog"
+            :key="c.id"
+            :to="`#cat-${c.id}`"
+            :icon="c.icon"
+            color="neutral"
+            variant="soft"
+            size="sm"
+          >
+            {{ c.name }}
+          </UButton>
+        </nav>
+      </UContainer>
+    </header>
+
+    <main>
+      <UContainer class="space-y-12 py-10 sm:py-14">
+        <UEmpty
+          v-if="total === 0"
+          icon="i-lucide-layout-grid"
+          title="Le portail est vide"
+          description="Ajoutez des catégories et des liens depuis l’administration."
+        />
+        <UEmpty
+          v-else-if="sections.length === 0"
+          icon="i-lucide-search-x"
+          title="Aucun résultat"
+          :description="`Rien ne correspond à « ${query} ».`"
+        />
+
+        <section
+          v-for="{ category: c, links } in sections"
+          :id="`cat-${c.id}`"
+          :key="c.id"
+          class="scroll-mt-6"
+          :aria-labelledby="`cat-${c.id}-title`"
+        >
+          <div class="mb-4 flex items-start gap-3">
+            <span
+              class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+            >
+              <UIcon :name="c.icon" class="size-5" />
+            </span>
+            <div>
+              <h2
+                :id="`cat-${c.id}-title`"
+                class="text-xl font-semibold tracking-tight text-highlighted"
+              >
+                {{ c.name }}
+              </h2>
+              <p v-if="c.description" class="text-sm text-muted">{{ c.description }}</p>
+            </div>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <LinkCard v-for="l in links" :key="l.id" :link="l" />
+          </div>
+        </section>
+      </UContainer>
+    </main>
+
+    <footer class="border-t border-default">
+      <UContainer class="flex items-center justify-between py-6 text-xs text-dimmed">
+        <span>{{ siteName }}</span>
+        <NuxtLink to="/admin" class="hover:text-muted">Administration</NuxtLink>
+      </UContainer>
+    </footer>
+  </div>
 </template>
