@@ -120,9 +120,9 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
           class="scroll-mt-6"
           :aria-labelledby="`cat-${c.id}-title`"
         >
-          <div class="mb-4 flex items-start gap-3">
+          <div class="mb-4 flex items-center gap-3">
             <span
-              class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+              class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
             >
               <UIcon :name="c.icon" class="size-5" />
             </span>
