@@ -39,6 +39,15 @@ export const MIGRATIONS: readonly string[] = [
      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
    );
    CREATE INDEX links_category ON links (category_id, position);`,
+  // v3 — site-wide settings as a singleton row: the organisation logo, an
+  // uploaded image stored like link files (random name on disk).
+  `CREATE TABLE site (
+     id              INTEGER PRIMARY KEY CHECK (id = 1),
+     logo_stored_name TEXT,
+     logo_mime        TEXT,
+     logo_updated_at  TEXT
+   );
+   INSERT INTO site (id) VALUES (1);`,
 ];
 
 export function openDb(path: string): DatabaseSync {

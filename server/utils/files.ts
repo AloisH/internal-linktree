@@ -1,7 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE } from "../../shared/utils/schemas";
+import {
+  ALLOWED_EXTENSIONS,
+  LOGO_EXTENSIONS,
+  MAX_FILE_SIZE,
+  MAX_LOGO_SIZE,
+} from "../../shared/utils/schemas";
 
 // Uploads live on disk next to the SQLite file (NUXT_UPLOADS_DIR), named by a
 // random token so the original name never touches the filesystem.
@@ -16,13 +21,26 @@ export interface UploadCheck {
   mime: string;
 }
 
-/** Validates name and size against the shared allowlist; returns the reason it fails. */
-export function checkUpload(file: UploadCandidate): UploadCheck | string {
+export interface UploadRules {
+  /** extension → mime */
+  allowed: Record<string, string>;
+  maxSize: number;
+}
+
+/** Link files: the broad document allowlist. */
+export const FILE_RULES: UploadRules = { allowed: ALLOWED_EXTENSIONS, maxSize: MAX_FILE_SIZE };
+/** The organisation logo: images only. */
+export const LOGO_RULES: UploadRules = { allowed: LOGO_EXTENSIONS, maxSize: MAX_LOGO_SIZE };
+
+/** Validates name and size against an allowlist; returns the reason it fails. */
+export function checkUpload(file: UploadCandidate, rules = FILE_RULES): UploadCheck | string {
   const ext = file.filename.split(".").pop()?.toLowerCase() ?? "";
-  const mime = ext && ext !== file.filename ? ALLOWED_EXTENSIONS[ext] : undefined;
+  const mime = ext && ext !== file.filename ? rules.allowed[ext] : undefined;
   if (!mime) return "Type de fichier non autorisé";
   if (file.size === 0) return "Fichier vide";
-  if (file.size > MAX_FILE_SIZE) return "Fichier trop volumineux (25 Mo maximum)";
+  if (file.size > rules.maxSize) {
+    return `Fichier trop volumineux (${Math.round(rules.maxSize / 1024 / 1024)} Mo maximum)`;
+  }
   return { ext, mime };
 }
 

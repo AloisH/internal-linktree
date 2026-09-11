@@ -26,3 +26,8 @@ export interface Link {
 export interface CategoryWithLinks extends Category {
   links: Link[];
 }
+
+/** Public site settings. `logo_version` changes on every upload (cache-busting). */
+export interface SiteSettings {
+  logo_version: string | null;
+}

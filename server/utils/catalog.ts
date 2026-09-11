@@ -160,3 +160,37 @@ export function reorderLinks(db: DatabaseSync, ids: number[]): void {
     throw err;
   }
 }
+
+// ── Site settings (singleton row) ────────────────────────────────
+
+export interface StoredLogo {
+  stored_name: string;
+  mime: string;
+}
+
+/** What the public API exposes — never the stored name. */
+export function getSiteSettings(db: DatabaseSync): SiteSettings {
+  const row = db.prepare("SELECT logo_updated_at FROM site WHERE id = 1").get() as {
+    logo_updated_at: string | null;
+  };
+  return { logo_version: row.logo_updated_at };
+}
+
+/** What the logo route needs. */
+export function getLogo(db: DatabaseSync): StoredLogo | undefined {
+  const row = db
+    .prepare("SELECT logo_stored_name AS stored_name, logo_mime AS mime FROM site WHERE id = 1")
+    .get() as { stored_name: string | null; mime: string | null };
+  return row.stored_name && row.mime ? { stored_name: row.stored_name, mime: row.mime } : undefined;
+}
+
+/** Replaces the logo; returns the previous stored name to unlink, if any. */
+export function setLogo(db: DatabaseSync, logo: StoredLogo | null): string | null {
+  const previous = getLogo(db)?.stored_name ?? null;
+  db.prepare(
+    `UPDATE site SET logo_stored_name = ?, logo_mime = ?,
+       logo_updated_at = CASE WHEN ? IS NULL THEN NULL ELSE strftime('%Y%m%d%H%M%f', 'now') END
+     WHERE id = 1`,
+  ).run(logo?.stored_name ?? null, logo?.mime ?? null, logo?.stored_name ?? null);
+  return previous;
+}

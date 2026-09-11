@@ -5,8 +5,11 @@ import {
   createUrlLink,
   deleteCategory,
   deleteLink,
+  getLogo,
+  getSiteSettings,
   getStoredFile,
   listCatalog,
+  setLogo,
   reorderCategories,
   reorderLinks,
   updateLink,
@@ -74,5 +77,26 @@ describe("catalog", () => {
     expect(deleteCategory(db, a.id)).toBeUndefined();
     expect(getStoredFile(db, f.id)).toBeUndefined();
     expect(listCatalog(db)).toEqual([]);
+  });
+
+  it("stores the logo as a singleton, versions it and hides the stored name", () => {
+    const db = openDb(":memory:");
+    expect(getSiteSettings(db)).toEqual({ logo_version: null });
+    expect(getLogo(db)).toBeUndefined();
+
+    expect(setLogo(db, { stored_name: "a.png", mime: "image/png" })).toBeNull();
+    const first = getSiteSettings(db).logo_version;
+    expect(first).toMatch(/^\d/);
+    expect(getSiteSettings(db)).not.toHaveProperty("stored_name");
+    expect(getLogo(db)).toEqual({ stored_name: "a.png", mime: "image/png" });
+
+    // replacing hands back the old file to unlink and bumps the version
+    expect(setLogo(db, { stored_name: "b.svg", mime: "image/svg+xml" })).toBe("a.png");
+    expect(getLogo(db)?.stored_name).toBe("b.svg");
+    expect(getSiteSettings(db).logo_version).not.toBeNull();
+
+    expect(setLogo(db, null)).toBe("b.svg");
+    expect(getLogo(db)).toBeUndefined();
+    expect(getSiteSettings(db)).toEqual({ logo_version: null });
   });
 });

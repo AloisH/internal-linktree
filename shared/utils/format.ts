@@ -32,3 +32,8 @@ export function hostOf(url: string | null): string {
     return url;
   }
 }
+
+/** URL of the organisation logo, or null when none is set. */
+export function logoUrl(site: SiteSettings | null | undefined): string | null {
+  return site?.logo_version ? `/api/logo?v=${encodeURIComponent(site.logo_version)}` : null;
+}

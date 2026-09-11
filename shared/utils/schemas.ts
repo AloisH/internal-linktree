@@ -92,3 +92,16 @@ export const ALLOWED_EXTENSIONS: Record<string, string> = {
 export const FILE_ACCEPT = Object.keys(ALLOWED_EXTENSIONS)
   .map((ext) => `.${ext}`)
   .join(",");
+
+/** The organisation logo: images only, small. */
+export const MAX_LOGO_SIZE = 2 * 1024 * 1024;
+export const LOGO_EXTENSIONS: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+};
+export const LOGO_ACCEPT = Object.keys(LOGO_EXTENSIONS)
+  .map((ext) => `.${ext}`)
+  .join(",");

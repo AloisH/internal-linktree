@@ -7,6 +7,9 @@ useSeoMeta({ title: "Administration", robots: "noindex" });
 const { data: catalog, refresh } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
   default: () => [],
 });
+const { data: site, refresh: refreshSite } = await useFetch<SiteSettings>("/api/site", {
+  default: () => ({ logo_version: null }),
+});
 const toast = useToast();
 
 // ── Category modal ─────────────────────────────────────────────
@@ -125,6 +128,8 @@ function linkMeta(l: Link): string {
     </header>
 
     <UContainer class="space-y-6 py-8">
+      <LogoCard :site="site" @saved="refreshSite" />
+
       <UEmpty
         v-if="catalog.length === 0"
         icon="i-lucide-folder-plus"

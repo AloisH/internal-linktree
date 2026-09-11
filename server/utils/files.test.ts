@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkUpload, cleanFileName, storedName } from "./files";
+import { LOGO_RULES, checkUpload, cleanFileName, storedName } from "./files";
 
 describe("files", () => {
   it("accepts allow-listed extensions and rejects the rest", () => {
@@ -11,6 +11,17 @@ describe("files", () => {
     expect(checkUpload({ filename: "noext", size: 10 })).toMatch(/non autorisé/);
     expect(checkUpload({ filename: "a.pdf", size: 0 })).toMatch(/vide/);
     expect(checkUpload({ filename: "a.pdf", size: 26 * 1024 * 1024 })).toMatch(/volumineux/);
+  });
+
+  it("restricts the logo to small images", () => {
+    expect(checkUpload({ filename: "logo.SVG", size: 10 }, LOGO_RULES)).toEqual({
+      ext: "svg",
+      mime: "image/svg+xml",
+    });
+    expect(checkUpload({ filename: "logo.pdf", size: 10 }, LOGO_RULES)).toMatch(/non autorisé/);
+    expect(checkUpload({ filename: "logo.png", size: 3 * 1024 * 1024 }, LOGO_RULES)).toMatch(
+      /2 Mo/,
+    );
   });
 
   it("stores under a random name and keeps a clean display name", () => {

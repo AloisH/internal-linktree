@@ -11,6 +11,10 @@ useSeoMeta({
 const { data: catalog } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
   default: () => [],
 });
+const { data: site } = await useFetch<SiteSettings>("/api/site", {
+  default: () => ({ logo_version: null }),
+});
+const logo = computed(() => logoUrl(site.value));
 
 const query = ref("");
 
@@ -40,6 +44,12 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
       <UContainer class="py-10 sm:py-14">
         <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div class="max-w-2xl">
+            <img
+              v-if="logo"
+              :src="logo"
+              :alt="siteName"
+              class="mb-5 h-14 w-auto max-w-60 object-contain object-left sm:h-16"
+            />
             <p
               class="flex items-center gap-2 font-mono text-xs tracking-wider text-primary uppercase"
             >
