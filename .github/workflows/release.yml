@@ -2,7 +2,9 @@ name: Release
 
 # Tag v1.2.3 → push ghcr.io/<owner>/internal-linktree:{1.2.3, 1.2, latest}
 # plus a GitHub Release with a conventional-commit changelog.
-# CI stops at "image is in GHCR" — deployment is `just deploy` on the server.
+# Then pings the Dokploy deploy webhook (DOKPLOY_WEBHOOK_URL secret) so the
+# VPS pulls the new :latest — the VPS never builds. Skipped while the secret
+# is unset, so the first release can publish the image before Dokploy exists.
 on:
   push:
     tags:
@@ -39,6 +41,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Deploy on Dokploy
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        if: env.DOKPLOY_WEBHOOK_URL != ''
+        run: curl -fsS -X POST "$DOKPLOY_WEBHOOK_URL"
       - name: Generate changelog
         uses: orhun/git-cliff-action@v4
         with:

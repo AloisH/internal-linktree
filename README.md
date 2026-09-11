@@ -33,9 +33,32 @@ just dev                  # http://localhost:3000 — admin sur /admin
 just lint       # oxfmt + oxlint + nuxt typecheck + knip
 just test       # vitest
 just build      # nuxt build
-just release patch   # tag → CI publie ghcr.io/AloisH/internal-linktree
-just deploy     # sur le serveur : compose pull && up -d
+just release patch   # tag → CI publie ghcr.io/aloish/internal-linktree et déploie
+just deploy     # hors Dokploy : compose pull && up -d sur le serveur
 ```
+
+## Déploiement (Dokploy)
+
+Le VPS ne construit rien : GitHub Actions construit l'image, la pousse sur
+GHCR, puis appelle le webhook de déploiement Dokploy qui tire `:latest`.
+
+Mise en place, une seule fois :
+
+1. `just release patch` — publie la première image sur GHCR.
+2. GitHub → Settings → Developer settings → token avec le seul scope
+   `read:packages` ; Dokploy → Settings → Registry → `ghcr.io` avec ce token.
+3. Dokploy → Application, provider **Docker**, image
+   `ghcr.io/aloish/internal-linktree:latest`, port 3000 :
+   - Environment : `NUXT_ADMIN_TOKEN`, `NUXT_PUBLIC_SITE_URL=https://<domaine>`
+     (et `NUXT_PUBLIC_SITE_NAME` / `NUXT_PUBLIC_SITE_TAGLINE` au besoin) ;
+   - Volumes : volume nommé monté sur `/app/data` (base SQLite + fichiers) ;
+   - Domains : le domaine, HTTPS Let's Encrypt — Traefik gère le TLS, le
+     `docker-compose.yml` + Caddy du dépôt ne servent que hors Dokploy.
+4. Dokploy → Deployments → copier l'URL du webhook ; GitHub → Settings →
+   Secrets → `DOKPLOY_WEBHOOK_URL`.
+
+Ensuite chaque `just release patch|minor|major` déploie. Retour arrière :
+mettre le tag précédent (`0.1.2`) dans Dokploy et redéployer.
 
 ## Configuration
 
