@@ -37,3 +37,10 @@ export function hostOf(url: string | null): string {
 export function logoUrl(site: SiteSettings | null | undefined): string | null {
   return site?.logo_version ? `/api/logo?v=${encodeURIComponent(site.logo_version)}` : null;
 }
+
+/** URL of a link's own icon, or null when it has none. */
+export function linkIconUrl(link: Pick<Link, "id" | "icon_version">): string | null {
+  return link.icon_version
+    ? `/api/links/${link.id}/icon?v=${encodeURIComponent(link.icon_version)}`
+    : null;
+}

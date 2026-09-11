@@ -48,6 +48,11 @@ export const MIGRATIONS: readonly string[] = [
      logo_updated_at  TEXT
    );
    INSERT INTO site (id) VALUES (1);`,
+  // v4 — a url link can carry its own icon (the site's favicon, fetched by
+  // the server, or an image uploaded by the admin), stored like a file.
+  `ALTER TABLE links ADD COLUMN icon_stored_name TEXT;
+   ALTER TABLE links ADD COLUMN icon_mime TEXT;
+   ALTER TABLE links ADD COLUMN icon_updated_at TEXT;`,
 ];
 
 export function openDb(path: string): DatabaseSync {

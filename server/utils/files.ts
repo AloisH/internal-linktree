@@ -3,8 +3,10 @@ import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ALLOWED_EXTENSIONS,
+  ICON_EXTENSIONS,
   LOGO_EXTENSIONS,
   MAX_FILE_SIZE,
+  MAX_ICON_SIZE,
   MAX_LOGO_SIZE,
 } from "../../shared/utils/schemas";
 
@@ -31,6 +33,8 @@ export interface UploadRules {
 export const FILE_RULES: UploadRules = { allowed: ALLOWED_EXTENSIONS, maxSize: MAX_FILE_SIZE };
 /** The organisation logo: images only. */
 export const LOGO_RULES: UploadRules = { allowed: LOGO_EXTENSIONS, maxSize: MAX_LOGO_SIZE };
+/** A url link's icon: images including .ico, small. */
+export const ICON_RULES: UploadRules = { allowed: ICON_EXTENSIONS, maxSize: MAX_ICON_SIZE };
 
 /** Validates name and size against an allowlist; returns the reason it fails. */
 export function checkUpload(file: UploadCandidate, rules = FILE_RULES): UploadCheck | string {

@@ -71,6 +71,11 @@ mettre le tag précédent (`0.1.2`) dans Dokploy et redéployer.
 | `NUXT_PUBLIC_SITE_TAGLINE` | Sous-titre du portail                     | voir `.env.example`     |
 | `NUXT_PUBLIC_SITE_URL`     | URL canonique                             | `http://localhost:3000` |
 
+Une application reçoit l'icône de son site (favicon) à la création : le
+serveur va la chercher, uniquement sur des adresses publiques. Pour un site
+interne injoignable depuis le VPS, l'admin importe l'icône à la main depuis
+la fenêtre de modification du lien.
+
 Le logo de l'établissement s'importe depuis `/admin` (PNG, JPG, WebP ou SVG,
 2 Mo max) et s'affiche en tête du portail ; il vit dans le dossier des fichiers.
 

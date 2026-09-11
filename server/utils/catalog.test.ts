@@ -5,10 +5,13 @@ import {
   createUrlLink,
   deleteCategory,
   deleteLink,
+  getLink,
+  getLinkIcon,
   getLogo,
   getSiteSettings,
   getStoredFile,
   listCatalog,
+  setLinkIcon,
   setLogo,
   reorderCategories,
   reorderLinks,
@@ -71,9 +74,11 @@ describe("catalog", () => {
     const a = createCategory(db, { name: "A", icon: "i-lucide-folder" });
     const f = createFileLink(db, { category_id: a.id, title: "doc" }, file);
     const u = createUrlLink(db, { category_id: a.id, title: "app", url: "https://x.example" });
-    expect(deleteLink(db, u.id)).toBeNull();
+    expect(deleteLink(db, u.id)).toEqual([]);
     expect(deleteLink(db, 999)).toBeUndefined();
-    expect(deleteCategory(db, a.id)).toEqual(["x.pdf"]);
+    const w = createUrlLink(db, { category_id: a.id, title: "app2", url: "https://y.example" });
+    setLinkIcon(db, w.id, { stored_name: "i.png", mime: "image/png" });
+    expect(deleteCategory(db, a.id)).toEqual(["x.pdf", "i.png"]);
     expect(deleteCategory(db, a.id)).toBeUndefined();
     expect(getStoredFile(db, f.id)).toBeUndefined();
     expect(listCatalog(db)).toEqual([]);
@@ -98,5 +103,21 @@ describe("catalog", () => {
     expect(setLogo(db, null)).toBe("b.svg");
     expect(getLogo(db)).toBeUndefined();
     expect(getSiteSettings(db)).toEqual({ logo_version: null });
+  });
+
+  it("gives a url link its own icon, versioned, and hands back the old file", () => {
+    const db = openDb(":memory:");
+    const a = createCategory(db, { name: "A", icon: "i-lucide-folder" });
+    const u = createUrlLink(db, { category_id: a.id, title: "app", url: "https://x.example" });
+    expect(u.icon_version).toBeNull();
+    expect(setLinkIcon(db, 999, null)).toBeUndefined();
+
+    expect(setLinkIcon(db, u.id, { stored_name: "a.ico", mime: "image/x-icon" })).toBeNull();
+    expect(getLink(db, u.id)?.icon_version).toMatch(/^\d/);
+    expect(getLink(db, u.id)).not.toHaveProperty("icon_stored_name");
+    expect(getLinkIcon(db, u.id)).toEqual({ stored_name: "a.ico", mime: "image/x-icon" });
+
+    expect(setLinkIcon(db, u.id, { stored_name: "b.png", mime: "image/png" })).toBe("a.ico");
+    expect(deleteLink(db, u.id)).toEqual(["b.png"]);
   });
 });

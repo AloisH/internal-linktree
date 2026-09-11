@@ -8,8 +8,11 @@ export default defineEventHandler(async (event) => {
   if (!contentType.startsWith("multipart/form-data")) {
     const input = await readValidatedBody(event, urlLinkSchema.parse);
     assertCategory(input.category_id);
+    const link = createUrlLink(db, input);
+    // Best effort: an unreachable site simply gets the generic icon.
+    await refreshLinkIcon(db, link.id, input.url);
     setResponseStatus(event, 201);
-    return createUrlLink(db, input);
+    return getLink(db, link.id) as Link;
   }
 
   const parts = (await readMultipartFormData(event)) ?? [];

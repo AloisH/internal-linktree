@@ -247,7 +247,14 @@ function linkMeta(l: Link): string {
             >
               <UIcon name="i-lucide-grip-vertical" class="size-4" />
             </span>
+            <img
+              v-if="linkIconUrl(l)"
+              :src="linkIconUrl(l) ?? undefined"
+              alt=""
+              class="size-5 shrink-0 rounded object-contain"
+            />
             <UIcon
+              v-else
               :name="l.kind === 'url' ? 'i-lucide-app-window' : fileIcon(l.file_mime)"
               class="size-5 shrink-0 text-muted"
             />

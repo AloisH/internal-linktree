@@ -19,6 +19,8 @@ export interface Link {
   file_name: string | null;
   file_mime: string | null;
   file_size: number | null;
+  /** Set when the link has its own icon; changes on every update (cache-busting). */
+  icon_version: string | null;
   position: number;
   created_at: string;
 }

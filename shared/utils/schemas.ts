@@ -105,3 +105,14 @@ export const LOGO_EXTENSIONS: Record<string, string> = {
 export const LOGO_ACCEPT = Object.keys(LOGO_EXTENSIONS)
   .map((ext) => `.${ext}`)
   .join(",");
+
+/** Icon of a url link: the site's favicon or an admin upload. */
+export const MAX_ICON_SIZE = 1024 * 1024;
+export const ICON_EXTENSIONS: Record<string, string> = {
+  ...LOGO_EXTENSIONS,
+  ico: "image/x-icon",
+  gif: "image/gif",
+};
+export const ICON_ACCEPT = Object.keys(ICON_EXTENSIONS)
+  .map((ext) => `.${ext}`)
+  .join(",");

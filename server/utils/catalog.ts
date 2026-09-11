@@ -4,7 +4,7 @@ import type { DatabaseSync } from "node:sqlite";
 // openDb(":memory:"). Route handlers stay one-liners on top.
 
 const LINK_COLUMNS =
-  "id, category_id, kind, title, description, url, file_name, file_mime, file_size, position, created_at";
+  "id, category_id, kind, title, description, url, file_name, file_mime, file_size, icon_updated_at AS icon_version, position, created_at";
 
 export function listCatalog(db: DatabaseSync): CategoryWithLinks[] {
   const categories = db
@@ -52,12 +52,20 @@ export function updateCategory(
 
 /** Deletes the category and its links; returns the stored file names to unlink. */
 export function deleteCategory(db: DatabaseSync, id: number): string[] | undefined {
-  const files = db
-    .prepare("SELECT stored_name FROM links WHERE category_id = ? AND stored_name IS NOT NULL")
-    .all(id) as unknown as { stored_name: string }[];
+  const rows = db
+    .prepare("SELECT stored_name, icon_stored_name FROM links WHERE category_id = ?")
+    .all(id) as unknown as StoredNames[];
   const { changes } = db.prepare("DELETE FROM categories WHERE id = ?").run(id);
   if (changes === 0) return undefined;
-  return files.map((f) => f.stored_name);
+  return rows.flatMap(storedNames);
+}
+
+interface StoredNames {
+  stored_name: string | null;
+  icon_stored_name: string | null;
+}
+function storedNames(row: StoredNames): string[] {
+  return [row.stored_name, row.icon_stored_name].filter((n): n is string => Boolean(n));
 }
 
 export function reorderCategories(db: DatabaseSync, ids: number[]): void {
@@ -139,14 +147,14 @@ export function updateLink(db: DatabaseSync, id: number, input: LinkUpdateInput)
   return getLink(db, id);
 }
 
-/** Deletes the link; returns the stored file name to unlink, or null for a url link. */
-export function deleteLink(db: DatabaseSync, id: number): string | null | undefined {
-  const row = db.prepare("SELECT stored_name FROM links WHERE id = ?").get(id) as
-    | { stored_name: string | null }
+/** Deletes the link; returns the stored file names (file, icon) to unlink. */
+export function deleteLink(db: DatabaseSync, id: number): string[] | undefined {
+  const row = db.prepare("SELECT stored_name, icon_stored_name FROM links WHERE id = ?").get(id) as
+    | StoredNames
     | undefined;
   if (!row) return undefined;
   db.prepare("DELETE FROM links WHERE id = ?").run(id);
-  return row.stored_name;
+  return storedNames(row);
 }
 
 export function reorderLinks(db: DatabaseSync, ids: number[]): void {
@@ -163,7 +171,7 @@ export function reorderLinks(db: DatabaseSync, ids: number[]): void {
 
 // ── Site settings (singleton row) ────────────────────────────────
 
-export interface StoredLogo {
+export interface StoredImage {
   stored_name: string;
   mime: string;
 }
@@ -177,7 +185,7 @@ export function getSiteSettings(db: DatabaseSync): SiteSettings {
 }
 
 /** What the logo route needs. */
-export function getLogo(db: DatabaseSync): StoredLogo | undefined {
+export function getLogo(db: DatabaseSync): StoredImage | undefined {
   const row = db
     .prepare("SELECT logo_stored_name AS stored_name, logo_mime AS mime FROM site WHERE id = 1")
     .get() as { stored_name: string | null; mime: string | null };
@@ -185,12 +193,43 @@ export function getLogo(db: DatabaseSync): StoredLogo | undefined {
 }
 
 /** Replaces the logo; returns the previous stored name to unlink, if any. */
-export function setLogo(db: DatabaseSync, logo: StoredLogo | null): string | null {
+export function setLogo(db: DatabaseSync, logo: StoredImage | null): string | null {
   const previous = getLogo(db)?.stored_name ?? null;
   db.prepare(
     `UPDATE site SET logo_stored_name = ?, logo_mime = ?,
        logo_updated_at = CASE WHEN ? IS NULL THEN NULL ELSE strftime('%Y%m%d%H%M%f', 'now') END
      WHERE id = 1`,
   ).run(logo?.stored_name ?? null, logo?.mime ?? null, logo?.stored_name ?? null);
+  return previous;
+}
+
+// ── Link icons ───────────────────────────────────────────────────
+
+/** What the icon route needs. */
+export function getLinkIcon(db: DatabaseSync, id: number): StoredImage | undefined {
+  const row = db
+    .prepare("SELECT icon_stored_name AS stored_name, icon_mime AS mime FROM links WHERE id = ?")
+    .get(id) as { stored_name: string | null; mime: string | null } | undefined;
+  return row?.stored_name && row.mime
+    ? { stored_name: row.stored_name, mime: row.mime }
+    : undefined;
+}
+
+/**
+ * Replaces the icon; returns the previous stored name to unlink (null when
+ * there was none), or undefined when the link does not exist.
+ */
+export function setLinkIcon(
+  db: DatabaseSync,
+  id: number,
+  icon: StoredImage | null,
+): string | null | undefined {
+  if (!getLink(db, id)) return undefined;
+  const previous = getLinkIcon(db, id)?.stored_name ?? null;
+  db.prepare(
+    `UPDATE links SET icon_stored_name = ?, icon_mime = ?,
+       icon_updated_at = CASE WHEN ? IS NULL THEN NULL ELSE strftime('%Y%m%d%H%M%f', 'now') END
+     WHERE id = ?`,
+  ).run(icon?.stored_name ?? null, icon?.mime ?? null, icon?.stored_name ?? null, id);
   return previous;
 }

@@ -50,6 +50,70 @@ watch(file, (f) => {
   if (f && !state.title.trim()) state.title = f.name.replace(/\.[^.]+$/, "");
 });
 
+// ── Icon of a url link (edit mode only, acts immediately) ─────
+const iconInput = useTemplateRef<HTMLInputElement>("iconInput");
+const iconPending = ref(false);
+const iconVersion = ref<string | null>(null);
+watch(open, (isOpen) => {
+  if (isOpen) iconVersion.value = props.link?.icon_version ?? null;
+});
+const iconUrl = computed(() =>
+  props.link ? linkIconUrl({ id: props.link.id, icon_version: iconVersion.value }) : null,
+);
+
+async function iconAction(work: () => Promise<Link | null>, done: string): Promise<void> {
+  iconPending.value = true;
+  try {
+    const link = await work();
+    iconVersion.value = link?.icon_version ?? null;
+    toast.add({ title: done, color: link ? "success" : "neutral" });
+    emit("saved");
+  } catch (err) {
+    const e = err as { data?: { message?: string } };
+    toast.add({
+      title: "Action impossible",
+      description: e.data?.message ?? "Réessayez dans un instant.",
+      color: "error",
+    });
+  } finally {
+    iconPending.value = false;
+  }
+}
+
+function fetchIcon(): void {
+  if (!props.link) return;
+  const id = props.link.id;
+  void iconAction(async () => {
+    const r = await $fetch<{ found: boolean; link: Link }>(`/api/admin/links/${id}/icon/refresh`, {
+      method: "POST",
+    });
+    if (!r.found) toast.add({ title: "Aucune icône trouvée sur le site", color: "warning" });
+    return r.link;
+  }, "Icône mise à jour");
+}
+
+function onPickIcon(event: Event): void {
+  const el = event.target as HTMLInputElement;
+  const f = el.files?.[0];
+  el.value = "";
+  if (!f || !props.link) return;
+  const id = props.link.id;
+  void iconAction(() => {
+    const body = new FormData();
+    body.set("file", f, f.name);
+    return $fetch<Link>(`/api/admin/links/${id}/icon`, { method: "POST", body });
+  }, "Icône importée");
+}
+
+function removeIcon(): void {
+  if (!props.link) return;
+  const id = props.link.id;
+  void iconAction(async () => {
+    await $fetch(`/api/admin/links/${id}/icon`, { method: "DELETE" });
+    return null;
+  }, "Icône retirée");
+}
+
 async function onSubmit(event: FormSubmitEvent<UrlLinkInput | FileLinkInput>): Promise<void> {
   pending.value = true;
   try {
@@ -128,6 +192,56 @@ async function onSubmit(event: FormSubmitEvent<UrlLinkInput | FileLinkInput>): P
 
         <UFormField label="Description" name="description" hint="Optionnel">
           <UTextarea v-model="state.description" class="w-full" :rows="2" />
+        </UFormField>
+
+        <UFormField v-if="link && !isFile" label="Icône" hint="Récupérée sur le site, ou importée">
+          <div class="flex items-center gap-3">
+            <span
+              class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+            >
+              <img v-if="iconUrl" :src="iconUrl" alt="" class="size-7 rounded object-contain" />
+              <UIcon v-else name="i-lucide-app-window" class="size-6" />
+            </span>
+            <input
+              ref="iconInput"
+              type="file"
+              :accept="ICON_ACCEPT"
+              class="hidden"
+              @change="onPickIcon"
+            />
+            <div class="flex flex-wrap gap-1">
+              <UButton
+                size="xs"
+                variant="soft"
+                icon="i-lucide-refresh-cw"
+                :loading="iconPending"
+                @click="fetchIcon"
+              >
+                Depuis le site
+              </UButton>
+              <UButton
+                size="xs"
+                variant="soft"
+                color="neutral"
+                icon="i-lucide-upload"
+                :disabled="iconPending"
+                @click="iconInput?.click()"
+              >
+                Importer
+              </UButton>
+              <UButton
+                v-if="iconUrl"
+                size="xs"
+                variant="ghost"
+                color="error"
+                icon="i-lucide-trash-2"
+                :disabled="iconPending"
+                @click="removeIcon"
+              >
+                Retirer
+              </UButton>
+            </div>
+          </div>
         </UFormField>
       </UForm>
     </template>
