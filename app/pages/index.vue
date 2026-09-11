@@ -146,7 +146,10 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
     <footer class="border-t border-default">
       <UContainer class="flex items-center justify-between py-6 text-xs text-dimmed">
         <span>{{ siteName }}</span>
-        <NuxtLink to="/admin" class="hover:text-muted">Administration</NuxtLink>
+        <div class="flex items-center gap-3">
+          <NuxtLink to="/admin" class="hover:text-muted">Administration</NuxtLink>
+          <UColorModeButton size="xs" aria-label="Changer de thème" />
+        </div>
       </UContainer>
     </footer>
   </div>
