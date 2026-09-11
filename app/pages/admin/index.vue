@@ -76,15 +76,29 @@ function swap<T>(list: T[], from: number, to: number): T[] {
   return copy;
 }
 
-function moveCategory(index: number, delta: number): void {
-  const ids = swap(catalog.value, index, index + delta).map((c) => c.id);
+function moveCategoryTo(from: number, to: number): void {
+  const ids = swap(catalog.value, from, to).map((c) => c.id);
   void run("POST", "/api/admin/categories/reorder", "Ordre mis à jour", { ids });
 }
+function moveCategory(index: number, delta: number): void {
+  moveCategoryTo(index, index + delta);
+}
 
-function moveLink(c: CategoryWithLinks, index: number, delta: number): void {
-  const ids = swap(c.links, index, index + delta).map((l) => l.id);
+function moveLinkTo(c: CategoryWithLinks, from: number, to: number): void {
+  const ids = swap(c.links, from, to).map((l) => l.id);
   void run("POST", "/api/admin/links/reorder", "Ordre mis à jour", { ids });
 }
+function moveLink(c: CategoryWithLinks, index: number, delta: number): void {
+  moveLinkTo(c, index, index + delta);
+}
+
+// Drag and drop: categories form group 0, the links of category N group N.
+const CATEGORIES = 0;
+const dnd = useDragReorder<number>((group, from, to) => {
+  if (group === CATEGORIES) return moveCategoryTo(from, to);
+  const c = catalog.value.find((x) => x.id === group);
+  if (c) moveLinkTo(c, from, to);
+});
 
 async function logout(): Promise<void> {
   await $fetch("/api/admin/logout", { method: "POST" });
@@ -141,9 +155,29 @@ function linkMeta(l: Link): string {
         </template>
       </UEmpty>
 
-      <UCard v-for="(c, ci) in catalog" :key="c.id" :ui="{ body: 'p-0 sm:p-0' }">
+      <UCard
+        v-for="(c, ci) in catalog"
+        :key="c.id"
+        :ui="{ body: 'p-0 sm:p-0' }"
+        class="transition-[box-shadow,opacity]"
+        :class="{
+          'ring-2 ring-primary': dnd.isTarget(CATEGORIES, ci),
+          'opacity-50': dnd.isDragging(CATEGORIES, ci),
+        }"
+        @dragover="dnd.onOver(CATEGORIES, ci, $event)"
+        @drop.prevent="dnd.onDrop(CATEGORIES, ci)"
+      >
         <template #header>
           <div class="flex flex-wrap items-center gap-3">
+            <span
+              draggable="true"
+              class="cursor-grab touch-none text-dimmed hover:text-muted active:cursor-grabbing"
+              title="Glisser pour réordonner"
+              @dragstart="dnd.onStart(CATEGORIES, ci, $event)"
+              @dragend="dnd.onEnd"
+            >
+              <UIcon name="i-lucide-grip-vertical" class="size-5" />
+            </span>
             <span
               class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
             >
@@ -196,8 +230,23 @@ function linkMeta(l: Link): string {
           <li
             v-for="(l, li) in c.links"
             :key="l.id"
-            class="flex items-center gap-3 px-4 py-3 sm:px-6"
+            class="flex items-center gap-3 px-4 py-3 transition-[box-shadow,opacity] sm:px-6"
+            :class="{
+              'ring-2 ring-primary ring-inset': dnd.isTarget(c.id, li),
+              'opacity-50': dnd.isDragging(c.id, li),
+            }"
+            @dragover="dnd.onOver(c.id, li, $event)"
+            @drop.prevent="dnd.onDrop(c.id, li)"
           >
+            <span
+              draggable="true"
+              class="cursor-grab touch-none text-dimmed hover:text-muted active:cursor-grabbing"
+              title="Glisser pour réordonner"
+              @dragstart="dnd.onStart(c.id, li, $event)"
+              @dragend="dnd.onEnd"
+            >
+              <UIcon name="i-lucide-grip-vertical" class="size-4" />
+            </span>
             <UIcon
               :name="l.kind === 'url' ? 'i-lucide-app-window' : fileIcon(l.file_mime)"
               class="size-5 shrink-0 text-muted"

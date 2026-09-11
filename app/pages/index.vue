@@ -136,8 +136,8 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
               <p v-if="c.description" class="text-sm text-muted">{{ c.description }}</p>
             </div>
           </div>
-          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <LinkCard v-for="l in links" :key="l.id" :link="l" />
+          <div class="grid grid-cols-3 gap-1 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+            <LinkTile v-for="l in links" :key="l.id" :link="l" />
           </div>
         </section>
       </UContainer>
