@@ -35,8 +35,9 @@ const meta = computed(() =>
           class="size-4 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100"
         />
       </span>
-      <span v-if="link.description" class="mt-1 line-clamp-2 block text-sm text-muted">
-        {{ link.description }}
+      <!-- Always one line so every card has the same height, with or without a description. -->
+      <span class="mt-1 block truncate text-sm text-muted" :title="link.description ?? undefined">
+        {{ link.description || "\u00a0" }}
       </span>
       <span v-if="meta" class="mt-2 block truncate font-mono text-xs text-dimmed">{{ meta }}</span>
     </span>
