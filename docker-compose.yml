@@ -7,7 +7,9 @@ services:
   app:
     image: ghcr.io/${GHCR_OWNER:?}/internal-linktree:${APP_TAG:-latest}
     environment:
-      NUXT_ADMIN_TOKEN: ${NUXT_ADMIN_TOKEN:?}
+      NUXT_AUTH_SECRET: ${NUXT_AUTH_SECRET:?}
+      NUXT_ADMIN_EMAIL: ${NUXT_ADMIN_EMAIL:-}
+      NUXT_ADMIN_PASSWORD: ${NUXT_ADMIN_PASSWORD:-}
       NUXT_PUBLIC_SITE_URL: https://${DOMAIN:?}
     volumes:
       - data:/app/data

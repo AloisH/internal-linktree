@@ -4,7 +4,7 @@
 
 ```sh
 mise install
-cp .env.example .env   # set NUXT_ADMIN_TOKEN
+cp .env.example .env   # set NUXT_AUTH_SECRET + the first admin
 pnpm install           # also installs the lefthook git hooks
 just dev
 ```

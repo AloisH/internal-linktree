@@ -1,8 +1,10 @@
 # internal-linktree
 
-Portail interne pour un établissement de santé : une page publique qui liste,
-par catégorie, les applications métier et les documents de référence, et une
-administration derrière un mot de passe pour les gérer.
+Portail interne pour une clinique de radiologie : une page, derrière une
+connexion, qui liste par catégorie les applications métier et les documents de
+référence ; une administration pour les gérer ; et le serveur d'identité de
+l'établissement (Better Auth), auquel les autres applications se connectent en
+OpenID Connect.
 
 Généré depuis [cabane](https://github.com/AloisH/cabane) : Nuxt 4, Nuxt UI,
 SQLite via `node:sqlite`, une image Docker.
@@ -15,16 +17,23 @@ SQLite via `node:sqlite`, une image Docker.
   entre catégories.
 - **Portail** — recherche instantanée, navigation par catégorie, PDF et images
   ouverts dans le navigateur, autres fichiers téléchargés sous leur nom d'origine.
-- **Administration** (`/admin`) — un mot de passe (`NUXT_ADMIN_TOKEN`), cookie
-  httpOnly, limitation des tentatives de connexion.
+- **Comptes et rôles** — connexion par e-mail et mot de passe, pas d'inscription
+  libre. Chaque utilisateur a un rôle : administrateur, radiologue,
+  manipulateur ou secrétaire. Les administrateurs gèrent le portail, les
+  comptes (`/admin/users`) et les applications connectées (`/admin/clients`).
+- **Fournisseur d'identité** — les autres applications de la clinique se
+  connectent via OpenID Connect (authorization code + PKCE) et reçoivent le
+  rôle dans le jeton d'identité et le `userinfo` (claim `role`). Les URLs à
+  renseigner sont affichées sur `/admin/clients` ; découverte :
+  `<site>/api/auth/.well-known/openid-configuration`.
 
 ## Développement
 
 ```sh
 mise install              # node / pnpm / just épinglés
-cp .env.example .env      # puis définir NUXT_ADMIN_TOKEN
+cp .env.example .env      # NUXT_AUTH_SECRET + le premier admin
 pnpm install
-just dev                  # http://localhost:3000 — admin sur /admin
+just dev                  # http://localhost:3000 — connexion avec NUXT_ADMIN_EMAIL
 ```
 
 ## Commandes
@@ -49,7 +58,8 @@ Mise en place, une seule fois :
    `read:packages` ; Dokploy → Settings → Registry → `ghcr.io` avec ce token.
 3. Dokploy → Application, provider **Docker**, image
    `ghcr.io/aloish/internal-linktree:latest`, port 3000 :
-   - Environment : `NUXT_ADMIN_TOKEN`, `NUXT_PUBLIC_SITE_URL=https://<domaine>`
+   - Environment : `NUXT_AUTH_SECRET`, `NUXT_ADMIN_EMAIL`, `NUXT_ADMIN_PASSWORD`
+     (premier admin, ignorés ensuite), `NUXT_PUBLIC_SITE_URL=https://<domaine>`
      (et `NUXT_PUBLIC_SITE_NAME` / `NUXT_PUBLIC_SITE_TAGLINE` au besoin) ;
    - Volumes : volume nommé monté sur `/app/data` (base SQLite + fichiers) ;
    - Domains : le domaine, HTTPS Let's Encrypt — Traefik gère le TLS, le
@@ -62,14 +72,16 @@ mettre le tag précédent (`0.1.2`) dans Dokploy et redéployer.
 
 ## Configuration
 
-| Variable                   | Rôle                                      | Défaut                  |
-| -------------------------- | ----------------------------------------- | ----------------------- |
-| `NUXT_ADMIN_TOKEN`         | Mot de passe de `/admin` (12+ caractères) | —                       |
-| `NUXT_DB_PATH`             | Fichier SQLite                            | `./data/app.db`         |
-| `NUXT_UPLOADS_DIR`         | Dossier des fichiers importés             | `./data/uploads`        |
-| `NUXT_PUBLIC_SITE_NAME`    | Nom affiché sur le portail                | `Portail interne`       |
-| `NUXT_PUBLIC_SITE_TAGLINE` | Sous-titre du portail                     | voir `.env.example`     |
-| `NUXT_PUBLIC_SITE_URL`     | URL canonique                             | `http://localhost:3000` |
+| Variable                   | Rôle                                                 | Défaut                  |
+| -------------------------- | ---------------------------------------------------- | ----------------------- |
+| `NUXT_AUTH_SECRET`         | Signe les sessions et les jetons (32+ caractères)    | —                       |
+| `NUXT_ADMIN_EMAIL`         | Premier admin, créé au démarrage si aucun compte     | —                       |
+| `NUXT_ADMIN_PASSWORD`      | Son mot de passe (12+ caractères), ignoré ensuite    | —                       |
+| `NUXT_DB_PATH`             | Fichier SQLite                                       | `./data/app.db`         |
+| `NUXT_UPLOADS_DIR`         | Dossier des fichiers importés                        | `./data/uploads`        |
+| `NUXT_PUBLIC_SITE_NAME`    | Nom affiché sur le portail                           | `Portail interne`       |
+| `NUXT_PUBLIC_SITE_TAGLINE` | Sous-titre du portail                                | voir `.env.example`     |
+| `NUXT_PUBLIC_SITE_URL`     | URL canonique, base des URLs OpenID Connect (issuer) | `http://localhost:3000` |
 
 Une application reçoit l'icône de son site (favicon) à la création : le
 serveur va la chercher, uniquement sur des adresses publiques. Pour un site

@@ -15,6 +15,8 @@ const { data: site } = await useFetch<SiteSettings>("/api/site", {
   default: () => ({ logo_version: null }),
 });
 const logo = computed(() => logoUrl(site.value));
+const { data: session } = await useSessionUser();
+const user = computed(() => session.value?.user ?? null);
 
 const query = ref("");
 
@@ -42,6 +44,21 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
   <div class="min-h-screen bg-elevated/40">
     <header class="border-b border-default bg-default/80 backdrop-blur">
       <UContainer class="py-10 sm:py-14">
+        <div class="mb-6 flex items-center justify-end gap-2 text-sm">
+          <span v-if="user" class="flex min-w-0 items-center gap-2 text-muted">
+            <UIcon name="i-lucide-circle-user-round" class="size-5 shrink-0" />
+            <span class="truncate">{{ user.name }}</span>
+            <UBadge color="neutral" variant="subtle" size="sm">{{ roleLabel(user.role) }}</UBadge>
+          </span>
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            icon="i-lucide-log-out"
+            aria-label="Déconnexion"
+            @click="signOut"
+          />
+        </div>
         <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <div class="max-w-2xl">
             <img
@@ -147,7 +164,9 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
       <UContainer class="flex items-center justify-between py-6 text-xs text-dimmed">
         <span>{{ siteName }}</span>
         <div class="flex items-center gap-3">
-          <NuxtLink to="/admin" class="hover:text-muted">Administration</NuxtLink>
+          <NuxtLink v-if="user?.role === 'admin'" to="/admin" class="hover:text-muted">
+            Administration
+          </NuxtLink>
           <UColorModeButton size="xs" aria-label="Changer de thème" />
         </div>
       </UContainer>

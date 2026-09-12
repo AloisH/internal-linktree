@@ -42,8 +42,8 @@ _message_after_copy: |
 
     cd {{ _copier_conf.dst_path }}
     mise install          # pinned node / pnpm / just
-    cp .env.example .env  # then set NUXT_ADMIN_TOKEN
+    cp .env.example .env  # then set NUXT_AUTH_SECRET + the first admin
     pnpm install
-    just dev              # http://localhost:3000 — admin at /admin
+    just dev              # http://localhost:3000 — sign in with NUXT_ADMIN_EMAIL
 
   Later, pull starter improvements with:  copier update

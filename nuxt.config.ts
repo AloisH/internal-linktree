@@ -1,18 +1,23 @@
-// One Nuxt app: the public page, /admin behind a shared secret, SQLite via node:sqlite.
+// One Nuxt app: the portal behind a login, /admin for the admin role, Better Auth as
+// the clinic's OIDC provider, SQLite via node:sqlite.
 export default defineNuxtConfig({
   compatibilityDate: "2026-08-01",
   modules: ["@nuxt/ui"],
   css: ["~/assets/css/main.css"],
 
   runtimeConfig: {
-    // NUXT_ADMIN_TOKEN — the /admin password. Checked at boot (server/plugins/boot.ts).
-    adminToken: "",
+    // NUXT_AUTH_SECRET — signs sessions and tokens (32+ chars). Checked at boot.
+    authSecret: "",
+    // NUXT_ADMIN_EMAIL / NUXT_ADMIN_PASSWORD — first admin, created at boot when
+    // the user table is empty (server/plugins/boot.ts). Ignored afterwards.
+    adminEmail: "",
+    adminPassword: "",
     // NUXT_DB_PATH — SQLite file, created on first boot.
     dbPath: "./data/app.db",
     // NUXT_UPLOADS_DIR — where uploaded files live (same volume as the DB in Docker).
     uploadsDir: "./data/uploads",
     public: {
-      // NUXT_PUBLIC_SITE_URL
+      // NUXT_PUBLIC_SITE_URL — also the Better Auth base URL / OIDC issuer prefix.
       siteUrl: "http://localhost:3000",
       // NUXT_PUBLIC_SITE_NAME — shown in the header and the browser tab.
       siteName: "Portail interne",

@@ -44,10 +44,21 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Boot and probe
         run: |
-          docker run -d --name app -p 3000:3000 -e NUXT_ADMIN_TOKEN=ci-only-admin-token internal-linktree:ci
+          docker run -d --name app -p 3000:3000 \
+            -e NUXT_AUTH_SECRET=ci-only-secret-ci-only-secret-ci-only \
+            -e NUXT_ADMIN_EMAIL=admin@example.com -e NUXT_ADMIN_PASSWORD=ci-only-admin-password \
+            internal-linktree:ci
           timeout 30 sh -c 'until curl -sf http://localhost:3000/api/health; do sleep 1; done'
-          curl -sf http://localhost:3000/ >/dev/null
+          # Anonymous: the portal redirects to the login, the API refuses, OIDC discovery answers.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/)" = "302"
+          curl -sf http://localhost:3000/login >/dev/null
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/categories)" = "401"
+          curl -sf http://localhost:3000/api/auth/.well-known/openid-configuration | grep -q '"authorization_endpoint"'
+          # The seeded admin can sign in (Better Auth wants an Origin) and read the catalog.
+          curl -sf -c cookies.txt -H 'origin: http://localhost:3000' -H 'content-type: application/json' \
+            -d '{"email":"admin@example.com","password":"ci-only-admin-password"}' \
+            http://localhost:3000/api/auth/sign-in/email >/dev/null
+          curl -sf -b cookies.txt http://localhost:3000/api/catalog >/dev/null
           docker logs app
 
   secrets:

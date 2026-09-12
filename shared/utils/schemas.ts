@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ROLES } from "./roles";
 
 // Schemas validated twice: in the browser by UForm and on the server by
 // readValidatedBody. Nuxt auto-imports everything under shared/utils.
@@ -116,3 +117,43 @@ export const ICON_EXTENSIONS: Record<string, string> = {
 export const ICON_ACCEPT = Object.keys(ICON_EXTENSIONS)
   .map((ext) => `.${ext}`)
   .join(",");
+
+// ── Accounts and OIDC clients ──────────────────────────────────
+
+export const loginSchema = z.object({
+  email: z.email("Adresse invalide"),
+  password: z.string().min(1, "Requis"),
+});
+export type LoginInput = z.infer<typeof loginSchema>;
+
+const password = z.string().min(12, "12 caractères minimum").max(128, "128 caractères maximum");
+
+export const userCreateSchema = z.object({
+  name,
+  email: z.email("Adresse invalide").max(254),
+  password,
+  role: z.enum(ROLES),
+});
+export type UserCreateInput = z.infer<typeof userCreateSchema>;
+
+export const passwordSchema = z.object({ password });
+export type PasswordInput = z.infer<typeof passwordSchema>;
+
+/** An application allowed to sign users in through this server (OIDC). */
+export const oauthClientSchema = z.object({
+  client_name: name,
+  redirect_uris: z
+    .string()
+    .transform((s) =>
+      s
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean),
+    )
+    .pipe(
+      z
+        .array(z.url({ protocol: /^https?$/, message: "Adresse invalide (http:// ou https://)" }))
+        .min(1, "Au moins une URL de retour"),
+    ),
+});
+export type OAuthClientInput = z.infer<typeof oauthClientSchema>;

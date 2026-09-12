@@ -18,7 +18,10 @@
     "knip": "knip"
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "^1.7.4",
+    "@better-auth/utils": "0.4.2",
     "@nuxt/ui": "^4.11.0",
+    "better-auth": "^1.7.4",
     "nuxt": "^4.5.2",
     "vue": "^3.5.41",
     "zod": "^4.5.4"

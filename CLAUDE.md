@@ -1,10 +1,14 @@
 # Agent guide
 
-Internal link portal for a healthcare organisation. One Nuxt 4 app: the public
-portal (`app/pages/index.vue`) lists categories of links — each link is either
-an app (url) or an uploaded file — and the admin (`app/pages/admin/`,
-`server/api/admin/`) manages them behind a shared secret. SQLite through
-`node:sqlite` (`server/utils/db.ts`), uploads on disk (`server/utils/files.ts`,
+Internal link portal for a radiology clinic, and its identity provider. One
+Nuxt 4 app: the portal (`app/pages/index.vue`, behind a login) lists categories
+of links — each link is either an app (url) or an uploaded file — and the admin
+(`app/pages/admin/`, `server/api/admin/`) manages links, accounts and the
+applications allowed to sign users in. Better Auth (`server/utils/auth.ts`)
+holds the accounts, gives every user one role (`shared/utils/roles.ts`) and
+acts as an OpenID Connect provider for the clinic's other apps
+(`/api/auth/oauth2/*`, role in the `role` claim). SQLite through `node:sqlite`
+(`server/utils/db.ts`), uploads on disk (`server/utils/files.ts`,
 `NUXT_UPLOADS_DIR`). Nuxt UI for components, zod for validation. Generated from
 cabane — same tooling, none of the infrastructure.
 
@@ -18,16 +22,30 @@ just build     # nuxt build → .output/
 just release patch|minor|major
 ```
 
-Needs `.env` (copy `.env.example`); boot refuses to start without a 12+ char
-`NUXT_ADMIN_TOKEN`.
+Needs `.env` (copy `.env.example`); boot refuses to start without a 32+ char
+`NUXT_AUTH_SECRET`. `NUXT_ADMIN_EMAIL` + `NUXT_ADMIN_PASSWORD` create the first
+admin while the user table is empty; every other account comes from
+`/admin/users`.
 
 ## Hard rules
 
 - **Schema changes are appended** to `MIGRATIONS` in `server/utils/db.ts`.
   Never edit or reorder a past entry — `PRAGMA user_version` tracks what ran.
-- **Admin routes live under `/api/admin/`** and admin pages under `/admin/`.
-  `server/middleware/admin.ts` guards both prefixes; do not add per-route checks
-  and do not put admin things elsewhere.
+  Better Auth's tables are frozen there too (v5): after a Better Auth upgrade or
+  a plugin change, `server/utils/auth.test.ts` tells what is missing — append
+  the `ALTER`/`CREATE` it needs, never run its own migrator.
+- **Everything needs a session, `/admin` needs the admin role.**
+  `server/middleware/auth.ts` guards pages and `/api/*` (public: `/api/auth/*`,
+  `/api/health`, `/api/site`, `/api/logo`); `app/middleware/auth.global.ts`
+  repeats the check on client-side navigation. Admin routes live under
+  `/api/admin/`, admin pages under `/admin/`; do not add per-route checks.
+- **Accounts go through Better Auth**, never through hand-written SQL on its
+  tables. Server side `useAuth().api.*`, browser side `authClient.*`
+  (`app/utils/auth-client.ts`). Roles are the `ROLES` tuple and the matching
+  access controller in `shared/utils/access.ts` — add a role in both.
+- **`@better-auth/utils` is pinned** in `package.json` only so pnpm resolves a
+  single `@better-auth/core`; two copies break the plugin types. Bump it with
+  Better Auth, to the version its `peerDependencies` name.
 - **Request bodies go through `readValidatedBody(event, schema.parse)`** with a
   zod schema. Schemas shared with a form live in `shared/utils/` (auto-imported
   on both sides); row types in `shared/types/`. The one multipart route

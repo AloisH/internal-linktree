@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { LinkModalMode } from "~/components/LinkModal.vue";
 
-definePageMeta({ middleware: "admin" });
 useSeoMeta({ title: "Administration", robots: "noindex" });
 
 const { data: catalog, refresh } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
@@ -100,11 +99,6 @@ const dnd = useDragReorder<number>((group, from, to) => {
   if (c) moveLinkTo(c, from, to);
 });
 
-async function logout(): Promise<void> {
-  await $fetch("/api/admin/logout", { method: "POST" });
-  await navigateTo("/admin/login");
-}
-
 function linkMeta(l: Link): string {
   return l.kind === "url" ? hostOf(l.url) : `${l.file_name ?? ""} · ${formatSize(l.file_size)}`;
 }
@@ -112,34 +106,9 @@ function linkMeta(l: Link): string {
 
 <template>
   <div class="min-h-screen bg-elevated/40">
-    <header class="sticky top-0 z-10 border-b border-default bg-default/90 backdrop-blur">
-      <UContainer class="flex h-16 items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <UIcon name="i-lucide-settings-2" class="size-5 text-primary" />
-          <h1 class="text-lg font-semibold tracking-tight">Administration</h1>
-        </div>
-        <div class="flex items-center gap-2">
-          <UButton
-            to="/"
-            target="_blank"
-            variant="ghost"
-            color="neutral"
-            icon="i-lucide-external-link"
-            class="hidden sm:inline-flex"
-          >
-            Voir le portail
-          </UButton>
-          <UButton icon="i-lucide-plus" @click="newCategory">Catégorie</UButton>
-          <UButton
-            variant="ghost"
-            color="neutral"
-            icon="i-lucide-log-out"
-            aria-label="Déconnexion"
-            @click="logout"
-          />
-        </div>
-      </UContainer>
-    </header>
+    <AdminHeader title="Liens et documents" icon="i-lucide-settings-2">
+      <UButton icon="i-lucide-plus" @click="newCategory">Catégorie</UButton>
+    </AdminHeader>
 
     <UContainer class="space-y-6 py-8">
       <LogoCard :site="site" @saved="refreshSite" />
