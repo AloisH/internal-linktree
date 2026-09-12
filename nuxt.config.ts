@@ -22,6 +22,10 @@ export default defineNuxtConfig({
       // NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN — lets people register with an address
       // ending in this domain (role "utilisateur"). Empty: no self sign-up.
       signupEmailDomain: "",
+      // NUXT_PUBLIC_INSECURE_REDIRECT_HOSTS — comma-separated hosts/IPs of an
+      // internal network without TLS, allowed as http:// redirect targets for
+      // declared applications. Tokens travel in clear there. Empty: https only.
+      insecureRedirectHosts: "",
       // NUXT_PUBLIC_SITE_NAME — shown in the header and the browser tab.
       siteName: "Portail interne",
       // NUXT_PUBLIC_SITE_TAGLINE

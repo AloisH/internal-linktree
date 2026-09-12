@@ -29,7 +29,10 @@ SQLite via `node:sqlite`, une image Docker.
   connectent via OpenID Connect (authorization code + PKCE) et reçoivent le
   rôle dans le jeton d'identité et le `userinfo` (claim `role`). Les URLs à
   renseigner sont affichées sur `/admin/clients` ; découverte :
-  `<site>/api/auth/.well-known/openid-configuration`.
+  `<site>/api/auth/.well-known/openid-configuration`. Les URL de retour sont
+  en https, ou en http sur `localhost` pour une application en développement.
+  Pour un réseau interne sans TLS, `NUXT_PUBLIC_INSECURE_REDIRECT_HOSTS` liste
+  les hôtes ou IP autorisés en http ; les jetons y circulent alors en clair.
 
 ## Développement
 
@@ -76,17 +79,18 @@ mettre le tag précédent (`0.1.2`) dans Dokploy et redéployer.
 
 ## Configuration
 
-| Variable                          | Rôle                                                   | Défaut                  |
-| --------------------------------- | ------------------------------------------------------ | ----------------------- |
-| `NUXT_AUTH_SECRET`                | Signe les sessions et les jetons (32+ caractères)      | —                       |
-| `NUXT_ADMIN_EMAIL`                | Premier admin, créé au démarrage si aucun compte       | —                       |
-| `NUXT_ADMIN_PASSWORD`             | Son mot de passe (12+ caractères), ignoré ensuite      | —                       |
-| `NUXT_DB_PATH`                    | Fichier SQLite                                         | `./data/app.db`         |
-| `NUXT_UPLOADS_DIR`                | Dossier des fichiers importés                          | `./data/uploads`        |
-| `NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN` | Domaine d'e-mail admis à l'inscription (vide = fermée) | —                       |
-| `NUXT_PUBLIC_SITE_NAME`           | Nom affiché sur le portail                             | `Portail interne`       |
-| `NUXT_PUBLIC_SITE_TAGLINE`        | Sous-titre du portail                                  | voir `.env.example`     |
-| `NUXT_PUBLIC_SITE_URL`            | URL canonique, base des URLs OpenID Connect (issuer)   | `http://localhost:3000` |
+| Variable                              | Rôle                                                           | Défaut                  |
+| ------------------------------------- | -------------------------------------------------------------- | ----------------------- |
+| `NUXT_AUTH_SECRET`                    | Signe les sessions et les jetons (32+ caractères)              | —                       |
+| `NUXT_ADMIN_EMAIL`                    | Premier admin, créé au démarrage si aucun compte               | —                       |
+| `NUXT_ADMIN_PASSWORD`                 | Son mot de passe (12+ caractères), ignoré ensuite              | —                       |
+| `NUXT_DB_PATH`                        | Fichier SQLite                                                 | `./data/app.db`         |
+| `NUXT_UPLOADS_DIR`                    | Dossier des fichiers importés                                  | `./data/uploads`        |
+| `NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN`     | Domaine d'e-mail admis à l'inscription (vide = fermée)         | —                       |
+| `NUXT_PUBLIC_INSECURE_REDIRECT_HOSTS` | Hôtes/IP admis en http comme URL de retour (vide = https seul) | —                       |
+| `NUXT_PUBLIC_SITE_NAME`               | Nom affiché sur le portail                                     | `Portail interne`       |
+| `NUXT_PUBLIC_SITE_TAGLINE`            | Sous-titre du portail                                          | voir `.env.example`     |
+| `NUXT_PUBLIC_SITE_URL`                | URL canonique, base des URLs OpenID Connect (issuer)           | `http://localhost:3000` |
 
 Une application reçoit l'icône de son site (favicon) à la création : le
 serveur va la chercher, uniquement sur des adresses publiques. Pour un site

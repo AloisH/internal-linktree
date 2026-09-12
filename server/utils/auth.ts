@@ -5,6 +5,8 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, jwt } from "better-auth/plugins";
 import { ac, roles } from "../../shared/utils/access";
 import { DEFAULT_ROLE, isRole } from "../../shared/utils/roles";
+import { isInsecureRedirectAllowed } from "../../shared/utils/redirects";
+import type { OAuthClientInput } from "../../shared/utils/schemas";
 import { isCompanyEmail, normalizeEmailDomain } from "../../shared/utils/signup";
 import { useDb } from "./db";
 
@@ -78,6 +80,56 @@ export async function seedAdmin(
   if (n > 0) return false;
   await auth.api.createUser({ body: { ...input, role: "admin" } });
   return true;
+}
+
+export interface CreatedClient {
+  client_id: string;
+  client_secret: string;
+}
+
+/**
+ * Declares an application on behalf of the signed-in admin (`headers` carry
+ * the session). The provider validates redirect URIs at registration only:
+ * https for "web", http://localhost for "native". The "insecure" kind — http
+ * on an allowed internal host — registers with a placeholder and then writes
+ * the real URIs straight into the row, the one place this app touches a
+ * Better Auth table by hand.
+ */
+export async function createOAuthClientFor(
+  auth: Auth,
+  db: DatabaseSync,
+  headers: Headers,
+  input: OAuthClientInput,
+  insecureHosts: string[],
+): Promise<CreatedClient> {
+  const insecure = input.kind === "insecure";
+  if (insecure) {
+    const bad = input.redirect_uris.find((u) => !isInsecureRedirectAllowed(u, insecureHosts));
+    if (bad) {
+      throw new APIError("BAD_REQUEST", {
+        code: "INSECURE_HOST_NOT_ALLOWED",
+        message: `http redirect URIs are only allowed on: ${insecureHosts.join(", ") || "(none)"}`,
+      });
+    }
+  }
+  const created = await auth.api.createOAuthClient({
+    headers,
+    body: {
+      client_name: input.client_name,
+      redirect_uris: insecure ? ["https://placeholder.invalid/callback"] : input.redirect_uris,
+      application_type: input.kind === "native" ? "native" : "web",
+      token_endpoint_auth_method: "client_secret_basic",
+      grant_types: ["authorization_code", "refresh_token"],
+    },
+  });
+  if (insecure) {
+    // string[] fields are stored as JSON by Better Auth's SQLite adapter.
+    db.prepare('UPDATE "oauthClient" SET "redirectUris" = ? WHERE "clientId" = ?').run(
+      JSON.stringify(input.redirect_uris),
+      created.client_id,
+    );
+  }
+  return { client_id: created.client_id, client_secret: created.client_secret ?? "" };
 }
 
 let auth: Auth | undefined;

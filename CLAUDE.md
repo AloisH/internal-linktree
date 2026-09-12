@@ -41,7 +41,9 @@ or, for addresses ending in `NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN`, from `/signup`
   repeats the check on client-side navigation. Admin routes live under
   `/api/admin/`, admin pages under `/admin/`; do not add per-route checks.
 - **Accounts go through Better Auth**, never through hand-written SQL on its
-  tables. Server side `useAuth().api.*`, browser side `authClient.*`
+  tables. One exception, `createOAuthClientFor` in `server/utils/auth.ts`,
+  rewrites a client's `redirectUris` for the http-on-internal-network escape
+  hatch (`NUXT_PUBLIC_INSECURE_REDIRECT_HOSTS`); keep it the only one. Server side `useAuth().api.*`, browser side `authClient.*`
   (`app/utils/auth-client.ts`). Roles are the `ROLES` tuple and the matching
   access controller in `shared/utils/access.ts` — add a role in both.
 - **`@better-auth/utils` is pinned** in `package.json` only so pnpm resolves a

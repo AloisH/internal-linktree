@@ -5,9 +5,29 @@ import type { FormSubmitEvent } from "@nuxt/ui";
 const emit = defineEmits<{ saved: [] }>();
 const open = defineModel<boolean>("open", { default: false });
 
-// The OAuth server only lets "web" clients redirect to https; an app under
-// development on http://localhost registers as "native" instead.
-const state = reactive({ client_name: "", redirect_uris: "", local: false });
+const hosts = parseInsecureHosts(useRuntimeConfig().public.insecureRedirectHosts);
+const kinds = [
+  { value: "web", label: "https", description: "Application déployée derrière TLS." },
+  {
+    value: "native",
+    label: "http sur localhost",
+    description: "Application en développement sur le poste.",
+  },
+  ...(hosts.length
+    ? [
+        {
+          value: "insecure",
+          label: "http sur le réseau interne",
+          description: `Sans chiffrement, sur : ${hosts.join(", ")}.`,
+        },
+      ]
+    : []),
+];
+const state = reactive<{ client_name: string; redirect_uris: string; kind: RedirectKind }>({
+  client_name: "",
+  redirect_uris: "",
+  kind: "web",
+});
 const pending = ref(false);
 const created = ref<{ client_id: string; client_secret: string } | null>(null);
 const toast = useToast();
@@ -16,27 +36,28 @@ watch(open, (isOpen) => {
   if (!isOpen) return;
   state.client_name = "";
   state.redirect_uris = "";
-  state.local = false;
+  state.kind = "web";
   created.value = null;
 });
 
 async function onSubmit(event: FormSubmitEvent<OAuthClientInput>): Promise<void> {
   pending.value = true;
-  const { data, error } = await authClient.oauth2.createClient({
-    client_name: event.data.client_name,
-    redirect_uris: event.data.redirect_uris,
-    application_type: state.local ? "native" : "web",
-    token_endpoint_auth_method: "client_secret_basic",
-    grant_types: ["authorization_code", "refresh_token"],
-  });
-  pending.value = false;
-  if (error || !data?.client_secret) {
-    const detail = (error as { error_description?: string } | null)?.error_description;
-    toast.add({ title: "Création impossible", description: detail, color: "error" });
-    return;
+  try {
+    created.value = await $fetch<CreatedClient>("/api/admin/oauth-clients", {
+      method: "POST",
+      body: event.data,
+    });
+    emit("saved");
+  } catch (err) {
+    const e = err as { data?: { message?: string; error_description?: string } };
+    toast.add({
+      title: "Création impossible",
+      description: e.data?.error_description ?? e.data?.message,
+      color: "error",
+    });
+  } finally {
+    pending.value = false;
   }
-  created.value = { client_id: data.client_id, client_secret: data.client_secret };
-  emit("saved");
 }
 
 async function copy(value: string): Promise<void> {
@@ -116,11 +137,9 @@ async function copy(value: string): Promise<void> {
             placeholder="https://app.example.com/auth/callback"
           />
         </UFormField>
-        <UCheckbox
-          v-model="state.local"
-          label="Application en développement"
-          description="Autorise des URL de retour en http://localhost. Sinon, https obligatoire."
-        />
+        <UFormField label="Type d’adresse de retour" name="kind">
+          <URadioGroup v-model="state.kind" :items="kinds" />
+        </UFormField>
       </UForm>
     </template>
     <template #footer>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { REDIRECT_KINDS } from "./redirects";
 import { ROLES } from "./roles";
 
 // Schemas validated twice: in the browser by UForm and on the server by
@@ -142,6 +143,7 @@ export type PasswordInput = z.infer<typeof passwordSchema>;
 /** An application allowed to sign users in through this server (OIDC). */
 export const oauthClientSchema = z.object({
   client_name: name,
+  kind: z.enum(REDIRECT_KINDS),
   redirect_uris: z
     .string()
     .transform((s) =>
