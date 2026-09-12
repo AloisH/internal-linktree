@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { FormSubmitEvent } from "@nuxt/ui";
+
 // Declares an application; the secret is shown once, right after creation.
 const emit = defineEmits<{ saved: [] }>();
 const open = defineModel<boolean>("open", { default: false });
@@ -38,13 +40,12 @@ watch(open, (isOpen) => {
   created.value = null;
 });
 
-async function onSubmit(): Promise<void> {
+async function onSubmit(event: FormSubmitEvent<OAuthClientInput>): Promise<void> {
   pending.value = true;
   try {
-    // The server runs the same schema: send the raw form, not the parsed output.
     created.value = await $fetch<CreatedClient>("/api/admin/oauth-clients", {
       method: "POST",
-      body: { ...state },
+      body: event.data,
     });
     emit("saved");
   } catch (err) {
