@@ -48,8 +48,16 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
           <span v-if="user" class="flex min-w-0 items-center gap-2 text-muted">
             <UIcon name="i-lucide-circle-user-round" class="size-5 shrink-0" />
             <span class="truncate">{{ user.name }}</span>
-            <UBadge color="neutral" variant="subtle" size="sm">{{ roleLabel(user.role) }}</UBadge>
           </span>
+          <UButton
+            v-if="user?.role === 'admin'"
+            to="/admin"
+            variant="soft"
+            size="sm"
+            icon="i-lucide-settings-2"
+          >
+            Administration
+          </UButton>
           <UButton
             variant="ghost"
             color="neutral"
