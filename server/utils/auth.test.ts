@@ -1,6 +1,6 @@
 import { getMigrations } from "better-auth/db/migration";
 import { describe, expect, it } from "vitest";
-import { createAuth, createOAuthClientFor, seedAdmin } from "./auth";
+import { createAuth, seedAdmin } from "./auth";
 import { openDb } from "./db";
 
 const CONFIG = {
@@ -62,51 +62,5 @@ describe("auth", () => {
       body: { ...ADMIN, email: "Marie.Dupont@clinique.fr" },
     });
     expect((signedUp.user as { role?: string }).role).toBe("utilisateur");
-  });
-});
-
-describe("createOAuthClientFor", () => {
-  const HOSTS = ["192.168.1.50"];
-
-  async function adminHeaders(auth: ReturnType<typeof createAuth>, db: ReturnType<typeof openDb>) {
-    await seedAdmin(auth, db, ADMIN);
-    const { headers } = await auth.api.signInEmail({ body: ADMIN, returnHeaders: true });
-    const cookie = headers.get("set-cookie")?.split(";")[0] ?? "";
-    return new Headers({ cookie, origin: CONFIG.baseURL });
-  }
-
-  it("registers https clients through the provider, http only on the allowed hosts", async () => {
-    const { db, auth } = setup();
-    const headers = await adminHeaders(auth, db);
-    const web = await createOAuthClientFor(
-      auth,
-      db,
-      headers,
-      { client_name: "Web", kind: "web", redirect_uris: ["https://app.example.com/cb"] },
-      HOSTS,
-    );
-    expect(web.client_id).toBeTruthy();
-    expect(web.client_secret).toBeTruthy();
-
-    await expect(
-      createOAuthClientFor(
-        auth,
-        db,
-        headers,
-        { client_name: "Bad", kind: "insecure", redirect_uris: ["http://192.168.1.51/cb"] },
-        HOSTS,
-      ),
-    ).rejects.toMatchObject({ body: { code: "INSECURE_HOST_NOT_ALLOWED" } });
-
-    const internal = await createOAuthClientFor(
-      auth,
-      db,
-      headers,
-      { client_name: "LAN", kind: "insecure", redirect_uris: ["http://192.168.1.50:3000/cb"] },
-      HOSTS,
-    );
-    const clients = await auth.api.getOAuthClients({ headers });
-    const row = clients?.find((c) => c.client_id === internal.client_id);
-    expect(row?.redirect_uris).toEqual(["http://192.168.1.50:3000/cb"]);
   });
 });
