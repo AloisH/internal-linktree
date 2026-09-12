@@ -24,8 +24,9 @@ just release patch|minor|major
 
 Needs `.env` (copy `.env.example`); boot refuses to start without a 32+ char
 `NUXT_AUTH_SECRET`. `NUXT_ADMIN_EMAIL` + `NUXT_ADMIN_PASSWORD` create the first
-admin while the user table is empty; every other account comes from
-`/admin/users`.
+admin while the user table is empty; other accounts come from `/admin/users`
+or, for addresses ending in `NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN`, from `/signup`
+(role `utilisateur`, checked in a Better Auth `hooks.before`).
 
 ## Hard rules
 

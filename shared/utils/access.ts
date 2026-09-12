@@ -14,4 +14,5 @@ export const roles = {
   radiologue: ac.newRole({}),
   manipulateur: ac.newRole({}),
   secretaire: ac.newRole({}),
+  utilisateur: ac.newRole({}),
 } satisfies Record<Role, unknown>;

@@ -19,6 +19,9 @@ export default defineNuxtConfig({
     public: {
       // NUXT_PUBLIC_SITE_URL — also the Better Auth base URL / OIDC issuer prefix.
       siteUrl: "http://localhost:3000",
+      // NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN — lets people register with an address
+      // ending in this domain (role "utilisateur"). Empty: no self sign-up.
+      signupEmailDomain: "",
       // NUXT_PUBLIC_SITE_NAME — shown in the header and the browser tab.
       siteName: "Portail interne",
       // NUXT_PUBLIC_SITE_TAGLINE

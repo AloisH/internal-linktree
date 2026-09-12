@@ -36,7 +36,7 @@ describe("auth", () => {
     ).rejects.toMatchObject({ statusCode: 401 });
   });
 
-  it("accounts are created by admins with a known role, never by sign-up", async () => {
+  it("without a sign-up domain, only admins create accounts, with a known role", async () => {
     const { auth } = setup();
     await expect(
       auth.api.signUpEmail({ body: { ...ADMIN, email: "new@example.com" } }),
@@ -50,5 +50,17 @@ describe("auth", () => {
       body: { ...ADMIN, email: "y@example.com", role: "manipulateur" },
     });
     expect(user.user.role).toBe("manipulateur");
+  });
+
+  it("with a sign-up domain, matching addresses register as utilisateur, others cannot", async () => {
+    const db = openDb(":memory:");
+    const auth = createAuth(db, { ...CONFIG, signupEmailDomain: "@Clinique.fr" });
+    await expect(
+      auth.api.signUpEmail({ body: { ...ADMIN, email: "someone@gmail.com" } }),
+    ).rejects.toMatchObject({ body: { code: "EMAIL_DOMAIN_NOT_ALLOWED" } });
+    const signedUp = await auth.api.signUpEmail({
+      body: { ...ADMIN, email: "Marie.Dupont@clinique.fr" },
+    });
+    expect((signedUp.user as { role?: string }).role).toBe("utilisateur");
   });
 });

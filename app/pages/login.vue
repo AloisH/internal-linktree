@@ -2,7 +2,7 @@
 import type { FormSubmitEvent } from "@nuxt/ui";
 
 useSeoMeta({ title: "Connexion", robots: "noindex" });
-const { siteName } = useRuntimeConfig().public;
+const { siteName, signupEmailDomain } = useRuntimeConfig().public;
 const route = useRoute();
 
 const { data: site } = await useFetch<SiteSettings>("/api/site", {
@@ -65,6 +65,14 @@ async function onSubmit(event: FormSubmitEvent<LoginInput>): Promise<void> {
         <UAlert v-if="error" color="error" variant="subtle" :title="error" />
         <UButton type="submit" block :loading="pending">Se connecter</UButton>
       </UForm>
+      <template v-if="signupEmailDomain" #footer>
+        <p class="text-center text-sm text-muted">
+          Pas encore de compte ?
+          <NuxtLink to="/signup" class="font-medium text-primary hover:underline">
+            Créer un compte
+          </NuxtLink>
+        </p>
+      </template>
     </UCard>
   </UContainer>
 </template>
