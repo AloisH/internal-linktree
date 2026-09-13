@@ -8,14 +8,13 @@ export default defineNitroPlugin(async () => {
     throw new Error("NUXT_AUTH_SECRET must be set to 32+ characters — see .env.example");
   }
   const db = useDb();
-  if (!adminEmail && !adminPassword) return;
-  if (!adminEmail || adminPassword.length < 12) {
+  // Nuxt parses env values: a numeric password would arrive as a number.
+  const email = String(adminEmail ?? "").trim();
+  const password = String(adminPassword ?? "");
+  if (!email && !password) return;
+  if (!email || password.length < 12) {
     throw new Error("NUXT_ADMIN_EMAIL and NUXT_ADMIN_PASSWORD (12+ characters) go together");
   }
-  const created = await seedAdmin(useAuth(), db, {
-    email: adminEmail,
-    password: adminPassword,
-    name: "Administrateur",
-  });
-  if (created) console.warn(`[auth] first admin account created: ${adminEmail}`);
+  const created = await seedAdmin(useAuth(), db, { email, password, name: "Administrateur" });
+  if (created) console.warn(`[auth] first admin account created: ${email}`);
 });
