@@ -7,6 +7,8 @@ const props = defineProps<{
   mode: LinkModalMode;
   categories: Category[];
   categoryId?: number;
+  /** Audience proposed for a new link. */
+  audience?: Audience;
   link?: Link | null;
 }>();
 const emit = defineEmits<{ saved: [] }>();
@@ -19,11 +21,18 @@ const title = computed(() => {
   return props.mode === "file" ? "Importer un fichier" : "Ajouter une application";
 });
 
-const state = reactive<{ category_id: number; title: string; description: string; url: string }>({
+const state = reactive<{
+  category_id: number;
+  title: string;
+  description: string;
+  url: string;
+  audience: Audience;
+}>({
   category_id: 0,
   title: "",
   description: "",
   url: "",
+  audience: "perso",
 });
 const file = ref<File | null>(null);
 const fileError = ref<string>();
@@ -33,6 +42,11 @@ const toast = useToast();
 const categoryItems = computed(() =>
   props.categories.map((c) => ({ label: c.name, value: c.id, icon: c.icon })),
 );
+const audienceItems = AUDIENCES.map((a) => ({
+  label: AUDIENCE_LABELS[a],
+  value: a,
+  icon: audienceIcon(a),
+}));
 
 watch(open, (isOpen) => {
   if (!isOpen) return;
@@ -40,6 +54,7 @@ watch(open, (isOpen) => {
   state.title = props.link?.title ?? "";
   state.description = props.link?.description ?? "";
   state.url = props.link?.url ?? "";
+  state.audience = props.link?.audience ?? props.audience ?? "perso";
   file.value = null;
   fileError.value = undefined;
 });
@@ -84,7 +99,7 @@ function fetchIcon(): void {
   if (!props.link) return;
   const id = props.link.id;
   void iconAction(async () => {
-    const r = await $fetch<{ found: boolean; link: Link }>(`/api/admin/links/${id}/icon/refresh`, {
+    const r = await $fetch<{ found: boolean; link: Link }>(`/api/links/${id}/icon/refresh`, {
       method: "POST",
     });
     if (!r.found) toast.add({ title: "Aucune icône trouvée sur le site", color: "warning" });
@@ -101,7 +116,7 @@ function onPickIcon(event: Event): void {
   void iconAction(() => {
     const body = new FormData();
     body.set("file", f, f.name);
-    return $fetch<Link>(`/api/admin/links/${id}/icon`, { method: "POST", body });
+    return $fetch<Link>(`/api/links/${id}/icon`, { method: "POST", body });
   }, "Icône importée");
 }
 
@@ -109,7 +124,7 @@ function removeIcon(): void {
   if (!props.link) return;
   const id = props.link.id;
   void iconAction(async () => {
-    await $fetch(`/api/admin/links/${id}/icon`, { method: "DELETE" });
+    await $fetch(`/api/links/${id}/icon`, { method: "DELETE" });
     return null;
   }, "Icône retirée");
 }
@@ -118,7 +133,7 @@ async function onSubmit(event: FormSubmitEvent<UrlLinkInput | FileLinkInput>): P
   pending.value = true;
   try {
     if (props.link) {
-      await $fetch(`/api/admin/links/${props.link.id}`, { method: "PATCH", body: event.data });
+      await $fetch(`/api/links/${props.link.id}`, { method: "PATCH", body: event.data });
     } else if (isFile.value) {
       if (!file.value) {
         fileError.value = "Choisissez un fichier";
@@ -128,10 +143,11 @@ async function onSubmit(event: FormSubmitEvent<UrlLinkInput | FileLinkInput>): P
       body.set("category_id", String(event.data.category_id));
       body.set("title", event.data.title);
       body.set("description", event.data.description ?? "");
+      body.set("audience", event.data.audience);
       body.set("file", file.value, file.value.name);
-      await $fetch("/api/admin/links", { method: "POST", body });
+      await $fetch("/api/links", { method: "POST", body });
     } else {
-      await $fetch("/api/admin/links", { method: "POST", body: event.data });
+      await $fetch("/api/links", { method: "POST", body: event.data });
     }
     toast.add({ title: props.link ? "Lien modifié" : "Lien ajouté", color: "success" });
     open.value = false;
@@ -192,6 +208,15 @@ async function onSubmit(event: FormSubmitEvent<UrlLinkInput | FileLinkInput>): P
 
         <UFormField label="Description" name="description" hint="Optionnel">
           <UTextarea v-model="state.description" class="w-full" :rows="2" />
+        </UFormField>
+
+        <UFormField
+          label="Visible par"
+          name="audience"
+          required
+          hint="Vous et les administrateurs pourrez le modifier"
+        >
+          <USelect v-model="state.audience" :items="audienceItems" class="w-full" />
         </UFormField>
 
         <UFormField v-if="link && !isFile" label="Icône" hint="Récupérée sur le site, ou importée">

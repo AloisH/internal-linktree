@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AUDIENCES } from "./audience";
 import { ROLES } from "./roles";
 
 // Schemas validated twice: in the browser by UForm and on the server by
@@ -44,6 +45,7 @@ const linkBase = {
   category_id: z.coerce.number().int().positive(),
   title: z.string().trim().min(1, "Requis").max(120, "120 caractères maximum"),
   description,
+  audience: z.enum(AUDIENCES),
 };
 
 /** A link to an application or an external page. */

@@ -4,9 +4,8 @@ const params = z.object({ id: z.coerce.number().int().positive() });
 
 export default defineEventHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, params.parse);
-  const previous = setLinkIcon(useDb(), id, null);
-  if (previous === undefined) throw createError({ statusCode: 404, statusMessage: "Not found" });
-  removeUpload(previous);
+  requireManagedLink(event, id);
+  deleteLink(useDb(), id)?.forEach(removeUpload);
   setResponseStatus(event, 204);
   return null;
 });

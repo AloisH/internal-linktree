@@ -13,9 +13,8 @@ export default defineEventHandler(async (event) => {
       message: "Catégorie inconnue",
     });
   }
-  const before = getLink(db, id);
-  const link = updateLink(db, id, input);
-  if (!before || !link) throw createError({ statusCode: 404, statusMessage: "Not found" });
+  const before = requireManagedLink(event, id);
+  const link = updateLink(db, id, input) as Link;
   if (link.kind === "url" && link.url && link.url !== before.url) {
     await refreshLinkIcon(db, id, link.url);
     return getLink(db, id) as Link;

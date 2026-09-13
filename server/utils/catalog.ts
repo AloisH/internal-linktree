@@ -3,16 +3,49 @@ import type { DatabaseSync } from "node:sqlite";
 // Pure SQL against the connection — no Nuxt, so vitest runs these with
 // openDb(":memory:"). Route handlers stay one-liners on top.
 
+// Always read through the join so owner_name comes along; stored names stay out.
 const LINK_COLUMNS =
-  "id, category_id, kind, title, description, url, file_name, file_mime, file_size, icon_updated_at AS icon_version, position, created_at";
+  "l.id, l.category_id, l.kind, l.title, l.description, l.url, l.file_name, l.file_mime, l.file_size, l.icon_updated_at AS icon_version, l.owner_id, u.name AS owner_name, l.audience, l.position, l.created_at";
+const LINK_FROM = `FROM links l LEFT JOIN "user" u ON u.id = l.owner_id`;
 
-export function listCatalog(db: DatabaseSync): CategoryWithLinks[] {
+/** Whose portal is being read: the session user. */
+export interface Viewer {
+  id: string;
+  role: string;
+}
+
+/**
+ * The portal of one user: their own private links, the links for everyone
+ * and for their role (an admin sees every shared link), ordered by the
+ * positions they set themselves, then the default order for the rest.
+ */
+export function listCatalog(db: DatabaseSync, viewer: Viewer): CategoryWithLinks[] {
+  const links = db
+    .prepare(
+      `SELECT ${LINK_COLUMNS} ${LINK_FROM}
+       LEFT JOIN link_positions p ON p.link_id = l.id AND p.user_id = :id
+       WHERE (l.audience = 'perso' AND l.owner_id = :id)
+          OR (l.audience != 'perso' AND (l.audience = 'tous' OR l.audience = :role OR :role = 'admin'))
+       ORDER BY p.position IS NULL, p.position, l.position, l.id`,
+    )
+    .all({ id: viewer.id, role: viewer.role }) as unknown as Link[];
+  return group(db, links);
+}
+
+/** Every shared link in the default order — what the admin manages. */
+export function listSharedCatalog(db: DatabaseSync): CategoryWithLinks[] {
+  const links = db
+    .prepare(
+      `SELECT ${LINK_COLUMNS} ${LINK_FROM} WHERE l.audience != 'perso' ORDER BY l.position, l.id`,
+    )
+    .all() as unknown as Link[];
+  return group(db, links);
+}
+
+function group(db: DatabaseSync, links: Link[]): CategoryWithLinks[] {
   const categories = db
     .prepare("SELECT * FROM categories ORDER BY position, id")
     .all() as unknown as Category[];
-  const links = db
-    .prepare(`SELECT ${LINK_COLUMNS} FROM links ORDER BY position, id`)
-    .all() as unknown as Link[];
   const byCategory = new Map<number, Link[]>();
   for (const link of links) {
     const list = byCategory.get(link.category_id) ?? [];
@@ -87,21 +120,34 @@ export interface StoredFile {
   file_size: number;
 }
 
-export function createUrlLink(db: DatabaseSync, input: UrlLinkInput): Link {
+export function createUrlLink(db: DatabaseSync, input: UrlLinkInput, ownerId: string): Link {
   const { lastInsertRowid } = db
     .prepare(
-      `INSERT INTO links (category_id, kind, title, description, url, position)
-       VALUES (?, 'url', ?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM links WHERE category_id = ?))`,
+      `INSERT INTO links (category_id, kind, title, description, url, owner_id, audience, position)
+       VALUES (?, 'url', ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM links WHERE category_id = ?))`,
     )
-    .run(input.category_id, input.title, input.description ?? null, input.url, input.category_id);
+    .run(
+      input.category_id,
+      input.title,
+      input.description ?? null,
+      input.url,
+      ownerId,
+      input.audience,
+      input.category_id,
+    );
   return getLink(db, Number(lastInsertRowid)) as Link;
 }
 
-export function createFileLink(db: DatabaseSync, input: FileLinkInput, file: StoredFile): Link {
+export function createFileLink(
+  db: DatabaseSync,
+  input: FileLinkInput,
+  file: StoredFile,
+  ownerId: string,
+): Link {
   const { lastInsertRowid } = db
     .prepare(
-      `INSERT INTO links (category_id, kind, title, description, file_name, stored_name, file_mime, file_size, position)
-       VALUES (?, 'file', ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM links WHERE category_id = ?))`,
+      `INSERT INTO links (category_id, kind, title, description, file_name, stored_name, file_mime, file_size, owner_id, audience, position)
+       VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM links WHERE category_id = ?))`,
     )
     .run(
       input.category_id,
@@ -111,13 +157,17 @@ export function createFileLink(db: DatabaseSync, input: FileLinkInput, file: Sto
       file.stored_name,
       file.file_mime,
       file.file_size,
+      ownerId,
+      input.audience,
       input.category_id,
     );
   return getLink(db, Number(lastInsertRowid)) as Link;
 }
 
 export function getLink(db: DatabaseSync, id: number): Link | undefined {
-  return db.prepare(`SELECT ${LINK_COLUMNS} FROM links WHERE id = ?`).get(id) as Link | undefined;
+  return db.prepare(`SELECT ${LINK_COLUMNS} ${LINK_FROM} WHERE l.id = ?`).get(id) as
+    | Link
+    | undefined;
 }
 
 /** What the download route needs and the public API never exposes. */
@@ -142,8 +192,16 @@ export function updateLink(db: DatabaseSync, id: number, input: LinkUpdateInput)
             .get(input.category_id) as { p: number }
         ).p ?? 0);
   db.prepare(
-    "UPDATE links SET category_id = ?, title = ?, description = ?, url = ?, position = ? WHERE id = ?",
-  ).run(input.category_id, input.title, input.description ?? null, url, position, id);
+    "UPDATE links SET category_id = ?, title = ?, description = ?, url = ?, audience = ?, position = ? WHERE id = ?",
+  ).run(
+    input.category_id,
+    input.title,
+    input.description ?? null,
+    url,
+    input.audience,
+    position,
+    id,
+  );
   return getLink(db, id);
 }
 
@@ -157,11 +215,29 @@ export function deleteLink(db: DatabaseSync, id: number): string[] | undefined {
   return storedNames(row);
 }
 
+/** The default order, set from the admin. */
 export function reorderLinks(db: DatabaseSync, ids: number[]): void {
   const stmt = db.prepare("UPDATE links SET position = ? WHERE id = ?");
   db.exec("BEGIN");
   try {
     ids.forEach((id, i) => stmt.run(i, id));
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+/** One user's own order, set by dragging tiles on the portal. Unknown ids are skipped. */
+export function reorderLinksFor(db: DatabaseSync, userId: string, ids: number[]): void {
+  const stmt = db.prepare(
+    `INSERT INTO link_positions (user_id, link_id, position)
+     SELECT ?, id, ? FROM links WHERE id = ?
+     ON CONFLICT (user_id, link_id) DO UPDATE SET position = excluded.position`,
+  );
+  db.exec("BEGIN");
+  try {
+    ids.forEach((id, i) => stmt.run(userId, i, id));
     db.exec("COMMIT");
   } catch (err) {
     db.exec("ROLLBACK");

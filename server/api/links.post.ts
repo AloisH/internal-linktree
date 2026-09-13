@@ -1,14 +1,17 @@
-// Two shapes on one route, told apart by the content type:
+// Anyone signed in adds links; the audience says who sees them and the
+// creator becomes the owner. Two shapes on one route, told apart by the
+// content type:
 //   application/json  → url link  (urlLinkSchema)
 //   multipart/form-data → file link (fileLinkSchema fields + a "file" part)
 export default defineEventHandler(async (event) => {
   const db = useDb();
+  const owner = requireUser(event).id;
   const contentType = getHeader(event, "content-type") ?? "";
 
   if (!contentType.startsWith("multipart/form-data")) {
     const input = await readValidatedBody(event, urlLinkSchema.parse);
     assertCategory(input.category_id);
-    const link = createUrlLink(db, input);
+    const link = createUrlLink(db, input, owner);
     // Best effort: an unreachable site simply gets the generic icon.
     await refreshLinkIcon(db, link.id, input.url);
     setResponseStatus(event, 201);
@@ -43,12 +46,17 @@ export default defineEventHandler(async (event) => {
   const stored = storedName(check.ext);
   writeUpload(stored, upload.data);
   try {
-    const link = createFileLink(db, parsed.data, {
-      file_name: cleanFileName(upload.filename),
-      stored_name: stored,
-      file_mime: check.mime,
-      file_size: upload.data.byteLength,
-    });
+    const link = createFileLink(
+      db,
+      parsed.data,
+      {
+        file_name: cleanFileName(upload.filename),
+        stored_name: stored,
+        file_mime: check.mime,
+        file_size: upload.data.byteLength,
+      },
+      owner,
+    );
     setResponseStatus(event, 201);
     return link;
   } catch (err) {

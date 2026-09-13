@@ -3,7 +3,9 @@ import type { LinkModalMode } from "~/components/LinkModal.vue";
 
 useSeoMeta({ title: "Administration", robots: "noindex" });
 
-const { data: catalog, refresh } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
+// Shared links only, in the default order; personal links live on each user's portal.
+const { data: catalog, refresh } = await useFetch<CategoryWithLinks[]>("/api/admin/catalog", {
+  headers: useRequestHeaders(["cookie"]),
   default: () => [],
 });
 const { data: site, refresh: refreshSite } = await useFetch<SiteSettings>("/api/site", {
@@ -65,7 +67,7 @@ function removeCategory(c: CategoryWithLinks): void {
 
 function removeLink(l: Link): void {
   if (!window.confirm(`Supprimer « ${l.title} » ?`)) return;
-  void run("DELETE", `/api/admin/links/${l.id}`, "Lien supprimé");
+  void run("DELETE", `/api/links/${l.id}`, "Lien supprimé");
 }
 
 function swap<T>(list: T[], from: number, to: number): T[] {
@@ -100,7 +102,9 @@ const dnd = useDragReorder<number>((group, from, to) => {
 });
 
 function linkMeta(l: Link): string {
-  return l.kind === "url" ? hostOf(l.url) : `${l.file_name ?? ""} · ${formatSize(l.file_size)}`;
+  const what =
+    l.kind === "url" ? hostOf(l.url) : `${l.file_name ?? ""} · ${formatSize(l.file_size)}`;
+  return l.owner_name ? `${what} · par ${l.owner_name}` : what;
 }
 </script>
 
@@ -117,7 +121,7 @@ function linkMeta(l: Link): string {
         v-if="catalog.length === 0"
         icon="i-lucide-folder-plus"
         title="Aucune catégorie"
-        description="Commencez par créer une catégorie, puis ajoutez-y des applications ou des fichiers."
+        description="Commencez par créer une catégorie : chacun pourra ensuite y ajouter ses applications et ses fichiers depuis le portail."
       >
         <template #actions>
           <UButton icon="i-lucide-plus" @click="newCategory">Créer une catégorie</UButton>
@@ -231,6 +235,16 @@ function linkMeta(l: Link): string {
               <p class="truncate font-medium">{{ l.title }}</p>
               <p class="truncate font-mono text-xs text-dimmed">{{ linkMeta(l) }}</p>
             </div>
+            <UBadge
+              v-if="l.audience !== 'tous'"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :icon="audienceIcon(l.audience)"
+              class="hidden sm:inline-flex"
+            >
+              {{ audienceTag(l.audience) }}
+            </UBadge>
             <UBadge :color="l.kind === 'url' ? 'primary' : 'neutral'" variant="subtle" size="sm">
               {{ l.kind === "url" ? "Application" : "Fichier" }}
             </UBadge>
@@ -313,6 +327,7 @@ function linkMeta(l: Link): string {
       :mode="linkMode"
       :categories="catalog"
       :category-id="linkCategoryId"
+      audience="tous"
       :link="editingLink"
       @saved="refresh"
     />

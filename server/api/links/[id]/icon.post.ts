@@ -2,9 +2,10 @@ import { z } from "zod";
 
 const params = z.object({ id: z.coerce.number().int().positive() });
 
-// multipart/form-data with one "file" part: the admin's own icon for the link.
+// multipart/form-data with one "file" part: the owner's own icon for the link.
 export default defineEventHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, params.parse);
+  requireManagedLink(event, id);
   const parts = (await readMultipartFormData(event)) ?? [];
   const upload = parts.find((p) => p.name === "file" && p.filename);
   if (!upload?.filename) {

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from "@nuxt/ui";
+import type { LinkModalMode } from "~/components/LinkModal.vue";
+
 const { siteName, siteTagline } = useRuntimeConfig().public;
 
 useSeoMeta({
@@ -8,7 +11,8 @@ useSeoMeta({
   ogDescription: siteTagline,
 });
 
-const { data: catalog } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
+const { data: catalog, refresh } = await useFetch<CategoryWithLinks[]>("/api/catalog", {
+  headers: useRequestHeaders(["cookie"]),
   default: () => [],
 });
 const { data: site } = await useFetch<SiteSettings>("/api/site", {
@@ -17,6 +21,7 @@ const { data: site } = await useFetch<SiteSettings>("/api/site", {
 const logo = computed(() => logoUrl(site.value));
 const { data: session } = await useSessionUser();
 const user = computed(() => session.value?.user ?? null);
+const toast = useToast();
 
 const query = ref("");
 
@@ -26,9 +31,12 @@ function matches(link: Link, q: string): boolean {
   );
 }
 
+/** Categories holding at least one link this user sees. */
+const populated = computed(() => catalog.value.filter((c) => c.links.length > 0));
+
 const sections = computed(() => {
   const q = query.value.trim().toLowerCase();
-  return catalog.value
+  return populated.value
     .map((c) => {
       const keepAll = !q || c.name.toLowerCase().includes(q);
       const links = keepAll ? c.links : c.links.filter((l) => matches(l, q));
@@ -38,6 +46,67 @@ const sections = computed(() => {
 });
 
 const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 0));
+
+// ── Add, edit, delete ──────────────────────────────────────────
+const linkOpen = ref(false);
+const linkMode = ref<LinkModalMode>("url");
+const linkCategoryId = ref<number>();
+const editingLink = ref<Link | null>(null);
+function newLink(mode: LinkModalMode, categoryId?: number): void {
+  linkMode.value = mode;
+  linkCategoryId.value = categoryId;
+  editingLink.value = null;
+  linkOpen.value = true;
+}
+function editLink(l: Link): void {
+  linkMode.value = "edit";
+  editingLink.value = l;
+  linkOpen.value = true;
+}
+function addItems(categoryId?: number): DropdownMenuItem[][] {
+  return [
+    [
+      {
+        label: "Une application",
+        icon: "i-lucide-app-window",
+        onSelect: () => newLink("url", categoryId),
+      },
+      { label: "Un fichier", icon: "i-lucide-upload", onSelect: () => newLink("file", categoryId) },
+    ],
+  ];
+}
+
+function canManage(l: Link): boolean {
+  return user.value !== null && canManageLink(l, user.value);
+}
+
+async function removeLink(l: Link): Promise<void> {
+  if (!window.confirm(`Supprimer « ${l.title} » ?`)) return;
+  try {
+    await $fetch(`/api/links/${l.id}`, { method: "DELETE" });
+    toast.add({ title: "Lien supprimé", color: "neutral" });
+  } catch {
+    toast.add({ title: "Suppression impossible", color: "error" });
+  }
+  await refresh();
+}
+
+// ── Drag and drop: each user orders their own tiles, per category ─
+const canDrag = computed(() => query.value.trim() === "");
+const dnd = useDragReorder<number>(async (categoryId, from, to) => {
+  const c = catalog.value.find((x) => x.id === categoryId);
+  if (!c) return;
+  const links = [...c.links];
+  const [item] = links.splice(from, 1);
+  links.splice(to, 0, item as Link);
+  c.links = links;
+  try {
+    await $fetch("/api/links/reorder", { method: "POST", body: { ids: links.map((l) => l.id) } });
+  } catch {
+    toast.add({ title: "Ordre non enregistré", color: "error" });
+  }
+  await refresh();
+});
 </script>
 
 <template>
@@ -48,6 +117,9 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
           <span v-if="user" class="flex min-w-0 items-center gap-2 text-muted">
             <UIcon name="i-lucide-circle-user-round" class="size-5 shrink-0" />
             <span class="truncate">{{ user.name }}</span>
+            <UBadge v-if="user.role" color="neutral" variant="subtle" size="sm">
+              {{ roleLabel(user.role) }}
+            </UBadge>
           </span>
           <UButton
             v-if="user?.role === 'admin'"
@@ -86,30 +158,42 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
             </h1>
             <p class="mt-3 text-base text-muted sm:text-lg">{{ siteTagline }}</p>
           </div>
-          <UInput
-            v-model="query"
-            icon="i-lucide-search"
-            size="xl"
-            placeholder="Rechercher une application ou un document…"
-            class="w-full lg:w-96"
-            :ui="{ trailing: 'pe-1' }"
-          >
-            <template v-if="query" #trailing>
+          <div class="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
+            <UInput
+              v-model="query"
+              icon="i-lucide-search"
+              size="xl"
+              placeholder="Rechercher une application ou un document…"
+              class="w-full lg:w-96"
+              :ui="{ trailing: 'pe-1' }"
+            >
+              <template v-if="query" #trailing>
+                <UButton
+                  color="neutral"
+                  variant="link"
+                  size="sm"
+                  icon="i-lucide-circle-x"
+                  aria-label="Effacer"
+                  @click="query = ''"
+                />
+              </template>
+            </UInput>
+            <UDropdownMenu :items="addItems()" :content="{ align: 'end' }">
               <UButton
-                color="neutral"
-                variant="link"
-                size="sm"
-                icon="i-lucide-circle-x"
-                aria-label="Effacer"
-                @click="query = ''"
-              />
-            </template>
-          </UInput>
+                icon="i-lucide-plus"
+                size="xl"
+                class="shrink-0 justify-center"
+                :disabled="catalog.length === 0"
+              >
+                Ajouter
+              </UButton>
+            </UDropdownMenu>
+          </div>
         </div>
 
-        <nav v-if="catalog.length > 1" class="mt-8 flex flex-wrap gap-2" aria-label="Catégories">
+        <nav v-if="populated.length > 1" class="mt-8 flex flex-wrap gap-2" aria-label="Catégories">
           <UButton
-            v-for="c in catalog"
+            v-for="c in populated"
             :key="c.id"
             :to="`#cat-${c.id}`"
             :icon="c.icon"
@@ -128,9 +212,19 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
         <UEmpty
           v-if="total === 0"
           icon="i-lucide-layout-grid"
-          title="Le portail est vide"
-          description="Ajoutez des catégories et des liens depuis l’administration."
-        />
+          title="Votre portail est vide"
+          :description="
+            catalog.length
+              ? 'Ajoutez vos applications et vos documents : pour vous seul, pour un métier ou pour tout le monde.'
+              : 'Un administrateur doit d’abord créer une catégorie.'
+          "
+        >
+          <template v-if="catalog.length" #actions>
+            <UDropdownMenu :items="addItems()">
+              <UButton icon="i-lucide-plus">Ajouter</UButton>
+            </UDropdownMenu>
+          </template>
+        </UEmpty>
         <UEmpty
           v-else-if="sections.length === 0"
           icon="i-lucide-search-x"
@@ -151,7 +245,7 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
             >
               <UIcon :name="c.icon" class="size-5" />
             </span>
-            <div>
+            <div class="min-w-0 flex-1">
               <h2
                 :id="`cat-${c.id}-title`"
                 class="text-xl font-semibold tracking-tight text-highlighted"
@@ -160,9 +254,36 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
               </h2>
               <p v-if="c.description" class="text-sm text-muted">{{ c.description }}</p>
             </div>
+            <UDropdownMenu :items="addItems(c.id)" :content="{ align: 'end' }">
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                icon="i-lucide-plus"
+                :aria-label="`Ajouter dans ${c.name}`"
+              />
+            </UDropdownMenu>
           </div>
           <div class="grid grid-cols-3 gap-1 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-            <LinkTile v-for="l in links" :key="l.id" :link="l" />
+            <LinkTile
+              v-for="(l, li) in links"
+              :key="l.id"
+              :link="l"
+              :editable="canManage(l)"
+              :draggable="canDrag"
+              class="rounded-xl transition-[box-shadow,opacity]"
+              :class="{
+                'cursor-grab active:cursor-grabbing': canDrag,
+                'ring-2 ring-primary': dnd.isTarget(c.id, li),
+                'opacity-40': dnd.isDragging(c.id, li),
+              }"
+              @dragstart="dnd.onStart(c.id, li, $event)"
+              @dragover="dnd.onOver(c.id, li, $event)"
+              @drop.prevent="dnd.onDrop(c.id, li)"
+              @dragend="dnd.onEnd"
+              @edit="editLink(l)"
+              @remove="removeLink(l)"
+            />
           </div>
         </section>
       </UContainer>
@@ -179,5 +300,15 @@ const total = computed(() => catalog.value.reduce((n, c) => n + c.links.length, 
         </div>
       </UContainer>
     </footer>
+
+    <LinkModal
+      v-model:open="linkOpen"
+      :mode="linkMode"
+      :categories="catalog"
+      :category-id="linkCategoryId"
+      audience="perso"
+      :link="editingLink"
+      @saved="refresh"
+    />
   </div>
 </template>

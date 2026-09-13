@@ -28,4 +28,5 @@ export default defineEventHandler(async (event) => {
     if (isApi) throw createError({ statusCode: 403, statusMessage: "Forbidden" });
     return sendRedirect(event, "/", 302);
   }
+  event.context.user = session.user;
 });

@@ -86,6 +86,17 @@ export const MIGRATIONS: readonly string[] = [
    create index "oauthConsent_clientId_idx" on "oauthConsent" ("clientId");
    create index "oauthConsent_userId_idx" on "oauthConsent" ("userId");
    create unique index "oauthClientResource_clientId_resourceId_uidx" on "oauthClientResource" ("clientId", "resourceId");`,
+  // v6 — links belong to whoever created them and carry an audience ("perso",
+  // "tous" or a role); each user keeps their own tile order on the portal.
+  `ALTER TABLE links ADD COLUMN owner_id TEXT REFERENCES "user"(id) ON DELETE SET NULL;
+   ALTER TABLE links ADD COLUMN audience TEXT NOT NULL DEFAULT 'tous';
+   CREATE INDEX links_owner ON links (owner_id);
+   CREATE TABLE link_positions (
+     user_id  TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+     link_id  INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+     position INTEGER NOT NULL,
+     PRIMARY KEY (user_id, link_id)
+   ) WITHOUT ROWID;`,
 ];
 
 export function openDb(path: string): DatabaseSync {

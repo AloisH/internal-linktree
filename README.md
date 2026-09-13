@@ -13,10 +13,15 @@ SQLite via `node:sqlite`, une image Docker.
 
 - **Catégories** — nom, description, icône (liste lucide), ordre manuel.
 - **Liens** — une application (URL http/https) ou un fichier importé (PDF,
-  images, Office, 25 Mo max). Titre, description, ordre manuel, déplacement
-  entre catégories.
-- **Portail** — recherche instantanée, navigation par catégorie, PDF et images
-  ouverts dans le navigateur, autres fichiers téléchargés sous leur nom d'origine.
+  images, Office, 25 Mo max). Titre, description, déplacement entre
+  catégories. Chacun ajoute les siens depuis le portail (bouton +) en
+  choisissant qui les voit : soi-même, un métier (radiologues, manipulateurs,
+  secrétaires…) ou tout le monde. Un lien se modifie ou se supprime par celui
+  qui l'a créé ou par un admin.
+- **Portail** — tuiles façon smartphone, glissées pour composer son propre
+  ordre (l'admin fixe l'ordre par défaut), recherche instantanée, navigation
+  par catégorie, PDF et images ouverts dans le navigateur, autres fichiers
+  téléchargés sous leur nom d'origine.
 - **Comptes et rôles** — connexion par e-mail et mot de passe. Chaque
   utilisateur a un rôle : administrateur, radiologue, manipulateur, secrétaire
   ou utilisateur. Les administrateurs gèrent le portail, les comptes
@@ -101,12 +106,13 @@ En Docker, base et fichiers vivent dans le volume `/app/data`.
 ## Arborescence
 
 ```
-app/pages/index.vue            portail public (recherche, catégories, cartes)
-app/pages/admin/               connexion + tableau de bord
-app/components/                LinkCard, CategoryModal, LinkModal
-server/api/catalog.get.ts      lecture publique
-server/api/files/[id].get.ts   téléchargement public
-server/api/admin/              CRUD catégories et liens, guardé par server/middleware/admin.ts
+app/pages/index.vue            portail (recherche, catégories, tuiles, ajout et ordre personnel)
+app/pages/admin/               catégories, liens partagés, comptes, applications OIDC
+app/components/                LinkTile, CategoryModal, LinkModal, UserModal…
+server/api/catalog.get.ts      ce que l'utilisateur connecté peut voir, dans son ordre
+server/api/links*              ajout, modification, suppression (propriétaire ou admin), ordre personnel
+server/api/files/[id].get.ts   téléchargement (session requise)
+server/api/admin/              catégories, ordre par défaut, logo — rôle admin (server/middleware/auth.ts)
 server/utils/catalog.ts        requêtes SQL pures (testées avec openDb(":memory:"))
 server/utils/files.ts          stockage disque des imports
 shared/utils/schemas.ts        schémas zod partagés formulaire ↔ API

@@ -21,6 +21,11 @@ export interface Link {
   file_size: number | null;
   /** Set when the link has its own icon; changes on every update (cache-busting). */
   icon_version: string | null;
+  /** Who created it (null once the account is gone); with the admins, the only one who may edit it. */
+  owner_id: string | null;
+  owner_name: string | null;
+  audience: Audience;
+  /** Default order, set from the admin; the portal serves each user's own order first. */
   position: number;
   created_at: string;
 }

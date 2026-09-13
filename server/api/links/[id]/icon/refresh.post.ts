@@ -7,8 +7,7 @@ const params = z.object({ id: z.coerce.number().int().positive() });
 export default defineEventHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, params.parse);
   const db = useDb();
-  const link = getLink(db, id);
-  if (!link) throw createError({ statusCode: 404, statusMessage: "Not found" });
+  const link = requireManagedLink(event, id);
   if (link.kind !== "url" || !link.url) {
     throw createError({
       statusCode: 400,

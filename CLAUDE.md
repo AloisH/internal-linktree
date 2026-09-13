@@ -2,9 +2,12 @@
 
 Internal link portal for a radiology clinic, and its identity provider. One
 Nuxt 4 app: the portal (`app/pages/index.vue`, behind a login) lists categories
-of links — each link is either an app (url) or an uploaded file — and the admin
-(`app/pages/admin/`, `server/api/admin/`) manages links, accounts and the
-applications allowed to sign users in. Better Auth (`server/utils/auth.ts`)
+of links — each link is either an app (url) or an uploaded file, belongs to
+whoever created it and has an audience (`shared/utils/audience.ts`: `perso`,
+`tous` or a role) — anyone signed in adds links from the portal and orders
+their own tiles; the admin (`app/pages/admin/`, `server/api/admin/`) manages
+categories, the default order of shared links, accounts and the applications
+allowed to sign users in. Better Auth (`server/utils/auth.ts`)
 holds the accounts, gives every user one role (`shared/utils/roles.ts`) and
 acts as an OpenID Connect provider for the clinic's other apps
 (`/api/auth/oauth2/*`, role in the `role` claim). SQLite through `node:sqlite`
@@ -37,9 +40,16 @@ or, for addresses ending in `NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN`, from `/signup`
   the `ALTER`/`CREATE` it needs, never run its own migrator.
 - **Everything needs a session, `/admin` needs the admin role.**
   `server/middleware/auth.ts` guards pages and `/api/*` (public: `/api/auth/*`,
-  `/api/health`, `/api/site`, `/api/logo`); `app/middleware/auth.global.ts`
+  `/api/health`, `/api/site`, `/api/logo`) and leaves the user on
+  `event.context.user` (`requireUser`); `app/middleware/auth.global.ts`
   repeats the check on client-side navigation. Admin routes live under
   `/api/admin/`, admin pages under `/admin/`; do not add per-route checks.
+- **Links are per row, not per route.** `/api/links/*` is open to every
+  session; a link is edited or deleted by its owner or an admin only
+  (`canManageLink`, enforced by `requireManagedLink`). `/api/catalog` returns
+  what the viewer may see (`listCatalog(db, viewer)`), `/api/admin/catalog`
+  every shared link; `/api/links/reorder` sets the viewer's own order
+  (`link_positions`), `/api/admin/links/reorder` the default one.
 - **Accounts go through Better Auth**, never through hand-written SQL on its
   tables. Server side `useAuth().api.*`, browser side `authClient.*`
   (`app/utils/auth-client.ts`). Roles are the `ROLES` tuple and the matching
@@ -50,7 +60,7 @@ or, for addresses ending in `NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN`, from `/signup`
 - **Request bodies go through `readValidatedBody(event, schema.parse)`** with a
   zod schema. Schemas shared with a form live in `shared/utils/` (auto-imported
   on both sides); row types in `shared/types/`. The one multipart route
-  (`server/api/admin/links.post.ts`) parses fields by hand, then `safeParse`.
+  (`server/api/links.post.ts`) parses fields by hand, then `safeParse`.
 - **SQL lives in `server/utils/catalog.ts`**, pure functions taking the
   `DatabaseSync`. Route handlers validate, call one of them, set the status.
 - **`stored_name` never leaves the server.** Public rows come from
@@ -68,6 +78,7 @@ or, for addresses ending in `NUXT_PUBLIC_SIGNUP_EMAIL_DOMAIN`, from `/signup`
 
 - Vitest, colocated `*.test.ts` under `server/` and `shared/`. Server utils are
   pure modules (`node:sqlite`, `node:crypto`) — test them with `openDb(":memory:")`,
-  no Nuxt environment needed.
+  no Nuxt environment needed. Links need an owner: create accounts with
+  `createAuth(db, …).api.createUser`, as `catalog.test.ts` does.
 - CI also builds the Docker image and probes `/api/health` and the 401 on
   `/api/admin/categories`.
