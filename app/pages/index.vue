@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DropdownMenuItem } from "@nuxt/ui";
+import type { DropdownMenuItem, TabsItem } from "@nuxt/ui";
 import type { LinkModalMode } from "~/components/LinkModal.vue";
 
 const { siteName, siteTagline } = useRuntimeConfig().public;
@@ -34,11 +34,44 @@ function matches(link: Link, q: string): boolean {
 /** Categories holding at least one link this user sees. */
 const populated = computed(() => catalog.value.filter((c) => c.links.length > 0));
 
+// ── Tabs: one per category, the last one opened remembered in this browser ─
+const TAB_KEY = "portal-tab";
+const firstTab = () => (populated.value[0] ? String(populated.value[0].id) : undefined);
+const tab = ref<string | undefined>(firstTab());
+const tabs = computed<TabsItem[]>(() =>
+  populated.value.map((c) => ({ label: c.name, icon: c.icon, value: String(c.id) })),
+);
+const current = computed(() => populated.value.find((c) => String(c.id) === tab.value));
+// The server renders the first tab; the browser then switches to the remembered one.
+onMounted(() => {
+  try {
+    const stored = localStorage.getItem(TAB_KEY);
+    if (stored && populated.value.some((c) => String(c.id) === stored)) tab.value = stored;
+  } catch {
+    // Storage unavailable: the first tab will do.
+  }
+});
+watch([populated, tab], () => {
+  if (!current.value) tab.value = firstTab();
+});
+watch(tab, (value) => {
+  if (!value) return;
+  try {
+    localStorage.setItem(TAB_KEY, value);
+  } catch {
+    // Not remembered, nothing else changes.
+  }
+});
+
+const searching = computed(() => query.value.trim() !== "");
+
+/** With a search: every category with matching links. Without: the open tab. */
 const sections = computed(() => {
   const q = query.value.trim().toLowerCase();
+  if (!q) return current.value ? [{ category: current.value, links: current.value.links }] : [];
   return populated.value
     .map((c) => {
-      const keepAll = !q || c.name.toLowerCase().includes(q);
+      const keepAll = c.name.toLowerCase().includes(q);
       const links = keepAll ? c.links : c.links.filter((l) => matches(l, q));
       return { category: c, links };
     })
@@ -92,7 +125,7 @@ async function removeLink(l: Link): Promise<void> {
 }
 
 // ── Drag and drop: each user orders their own tiles, per category ─
-const canDrag = computed(() => query.value.trim() === "");
+const canDrag = computed(() => !searching.value);
 const dnd = useDragReorder<number>(async (categoryId, from, to) => {
   const c = catalog.value.find((x) => x.id === categoryId);
   if (!c) return;
@@ -190,25 +223,11 @@ const dnd = useDragReorder<number>(async (categoryId, from, to) => {
             </UDropdownMenu>
           </div>
         </div>
-
-        <nav v-if="populated.length > 1" class="mt-8 flex flex-wrap gap-2" aria-label="Catégories">
-          <UButton
-            v-for="c in populated"
-            :key="c.id"
-            :to="`#cat-${c.id}`"
-            :icon="c.icon"
-            color="neutral"
-            variant="soft"
-            size="sm"
-          >
-            {{ c.name }}
-          </UButton>
-        </nav>
       </UContainer>
     </header>
 
     <main>
-      <UContainer class="space-y-12 py-10 sm:py-14">
+      <UContainer class="space-y-8 py-10 sm:py-14">
         <UEmpty
           v-if="total === 0"
           icon="i-lucide-layout-grid"
@@ -232,6 +251,15 @@ const dnd = useDragReorder<number>(async (categoryId, from, to) => {
           :description="`Rien ne correspond à « ${query} ».`"
         />
 
+        <UTabs
+          v-if="!searching && tabs.length > 0"
+          v-model="tab"
+          :items="tabs"
+          :content="false"
+          size="lg"
+          :ui="{ list: 'w-fit max-w-full overflow-x-auto', trigger: 'shrink-0' }"
+        />
+
         <section
           v-for="{ category: c, links } in sections"
           :id="`cat-${c.id}`"
@@ -241,6 +269,7 @@ const dnd = useDragReorder<number>(async (categoryId, from, to) => {
         >
           <div class="mb-4 flex items-center gap-3">
             <span
+              v-if="searching"
               class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
             >
               <UIcon :name="c.icon" class="size-5" />
@@ -249,6 +278,7 @@ const dnd = useDragReorder<number>(async (categoryId, from, to) => {
               <h2
                 :id="`cat-${c.id}-title`"
                 class="text-xl font-semibold tracking-tight text-highlighted"
+                :class="{ 'sr-only': !searching }"
               >
                 {{ c.name }}
               </h2>

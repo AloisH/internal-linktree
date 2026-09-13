@@ -19,9 +19,9 @@ SQLite via `node:sqlite`, une image Docker.
   secrétaires…) ou tout le monde. Un lien se modifie ou se supprime par celui
   qui l'a créé ou par un admin.
 - **Portail** — tuiles façon smartphone, glissées pour composer son propre
-  ordre (l'admin fixe l'ordre par défaut), recherche instantanée, navigation
-  par catégorie, PDF et images ouverts dans le navigateur, autres fichiers
-  téléchargés sous leur nom d'origine.
+  ordre (l'admin fixe l'ordre par défaut), un onglet par catégorie, recherche
+  instantanée sur tout le portail, PDF et images ouverts dans le navigateur,
+  autres fichiers téléchargés sous leur nom d'origine.
 - **Comptes et rôles** — connexion par e-mail et mot de passe. Chaque
   utilisateur a un rôle : administrateur, radiologue, manipulateur, secrétaire
   ou utilisateur. Les administrateurs gèrent le portail, les comptes
